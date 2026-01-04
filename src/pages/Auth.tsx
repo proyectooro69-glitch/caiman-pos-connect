@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import caimanLogo from "@/assets/caiman-logo.png";
 
 type AuthMode = "login" | "register";
@@ -15,6 +16,7 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, signIn, signUp } = useAuth();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -23,21 +25,72 @@ const Auth = () => {
     businessName: "",
   });
 
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate("/dashboard");
+    }
+  }, [user, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      if (mode === "login") {
+        const { error } = await signIn(formData.email, formData.password);
+        if (error) {
+          let message = "Error al iniciar sesión";
+          if (error.message.includes("Invalid login credentials")) {
+            message = "Credenciales incorrectas";
+          } else if (error.message.includes("Email not confirmed")) {
+            message = "Por favor confirma tu correo electrónico";
+          }
+          toast({
+            title: "Error",
+            description: message,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "¡Bienvenido de vuelta!",
+            description: "Has iniciado sesión correctamente",
+          });
+          navigate("/dashboard");
+        }
+      } else {
+        const { error } = await signUp(formData.email, formData.password, {
+          nombre: formData.name,
+          negocio: formData.businessName,
+        });
+        if (error) {
+          let message = "Error al crear la cuenta";
+          if (error.message.includes("already registered")) {
+            message = "Este correo ya está registrado";
+          } else if (error.message.includes("Password")) {
+            message = "La contraseña debe tener al menos 6 caracteres";
+          }
+          toast({
+            title: "Error",
+            description: message,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "¡Cuenta creada!",
+            description: "Revisa tu correo para confirmar tu cuenta",
+          });
+        }
+      }
+    } catch (error) {
       toast({
-        title: mode === "login" ? "¡Bienvenido de vuelta!" : "¡Cuenta creada!",
-        description: mode === "login" 
-          ? "Has iniciado sesión correctamente" 
-          : "Tu cuenta ha sido creada exitosamente",
+        title: "Error",
+        description: "Ocurrió un error inesperado",
+        variant: "destructive",
       });
-      navigate("/dashboard");
-    }, 1500);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -178,6 +231,7 @@ const Auth = () => {
                   onChange={handleInputChange}
                   className="pl-10 pr-10"
                   required
+                  minLength={6}
                 />
                 <button
                   type="button"
