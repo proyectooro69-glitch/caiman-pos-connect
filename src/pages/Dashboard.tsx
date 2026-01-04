@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -19,24 +19,25 @@ import {
   Receipt
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import caimanLogo from "@/assets/caiman-logo.png";
+import type { Inventario, ProductCategory } from "@/types/database";
 
-// Sample products data
-const products = [
-  { id: 1, name: "Coca-Cola 600ml", price: 18.50, category: "Bebidas", stock: 24 },
-  { id: 2, name: "Papas Sabritas", price: 22.00, category: "Snacks", stock: 15 },
-  { id: 3, name: "Pan Bimbo Grande", price: 45.00, category: "Panadería", stock: 8 },
-  { id: 4, name: "Leche Lala 1L", price: 26.50, category: "Lácteos", stock: 12 },
-  { id: 5, name: "Huevo 12 pzas", price: 52.00, category: "Básicos", stock: 20 },
-  { id: 6, name: "Agua Ciel 1L", price: 12.00, category: "Bebidas", stock: 30 },
-  { id: 7, name: "Galletas Marías", price: 18.00, category: "Snacks", stock: 25 },
-  { id: 8, name: "Jabón Zote", price: 28.00, category: "Limpieza", stock: 18 },
-];
-
-const categories = ["Todos", "Bebidas", "Snacks", "Panadería", "Lácteos", "Básicos", "Limpieza"];
+// Categories from database
+const categoryLabels: Record<ProductCategory, string> = {
+  bebidas: "Bebidas",
+  alimentos: "Alimentos",
+  productos_limpieza: "Limpieza",
+  vestuario: "Vestuario",
+  calzados: "Calzados",
+  ferreteria: "Ferretería",
+  otros: "Otros",
+};
 
 interface CartItem {
-  id: number;
+  id: string;
   name: string;
   price: number;
   quantity: number;
@@ -45,17 +46,49 @@ interface CartItem {
 const Dashboard = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("Todos");
+  const [selectedCategory, setSelectedCategory] = useState<string>("Todos");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [products, setProducts] = useState<Inventario[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
+
+  // Fetch products from Supabase
+  useEffect(() => {
+    const fetchProducts = async () => {
+      const { data, error } = await supabase
+        .from('inventario')
+        .select('*')
+        .eq('tipo', 'producto_final');
+      
+      if (error) {
+        console.error('Error fetching products:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los productos",
+          variant: "destructive",
+        });
+      } else {
+        setProducts(data || []);
+      }
+      setLoading(false);
+    };
+
+    fetchProducts();
+  }, [toast]);
+
+  // Get unique categories from products
+  const categories = ["Todos", ...Object.values(categoryLabels)];
 
   const filteredProducts = products.filter((product) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === "Todos" || product.category === selectedCategory;
+    const matchesSearch = product.nombre.toLowerCase().includes(searchTerm.toLowerCase());
+    const categoryLabel = categoryLabels[product.categoria];
+    const matchesCategory = selectedCategory === "Todos" || categoryLabel === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const addToCart = (product: typeof products[0]) => {
+  const addToCart = (product: Inventario) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
@@ -63,11 +96,11 @@ const Dashboard = () => {
           item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
-      return [...prev, { id: product.id, name: product.name, price: product.price, quantity: 1 }];
+      return [...prev, { id: product.id, name: product.nombre, price: product.precio, quantity: 1 }];
     });
   };
 
-  const updateQuantity = (id: number, delta: number) => {
+  const updateQuantity = (id: string, delta: number) => {
     setCart((prev) =>
       prev
         .map((item) =>
@@ -77,7 +110,7 @@ const Dashboard = () => {
     );
   };
 
-  const removeFromCart = (id: number) => {
+  const removeFromCart = (id: string) => {
     setCart((prev) => prev.filter((item) => item.id !== id));
   };
 
@@ -85,7 +118,8 @@ const Dashboard = () => {
   const tax = subtotal * 0.16;
   const total = subtotal + tax;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut();
     navigate("/");
   };
 
@@ -148,8 +182,12 @@ const Dashboard = () => {
                 <User className="h-5 w-5 text-muted-foreground" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">Juan Pérez</p>
-                <p className="text-xs text-muted-foreground truncate">Mi Tienda</p>
+                <p className="text-sm font-medium text-foreground truncate">
+                  {user?.user_metadata?.nombre || user?.email?.split('@')[0] || 'Usuario'}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {user?.user_metadata?.negocio || 'Punto de Venta'}
+                </p>
               </div>
             </div>
             <Button
@@ -215,32 +253,54 @@ const Dashboard = () => {
           </div>
 
           {/* Products Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredProducts.map((product, index) => (
+          {loading ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="glass-card rounded-xl p-4 animate-pulse">
+                  <div className="w-full aspect-square rounded-lg bg-secondary mb-3" />
+                  <div className="h-4 bg-secondary rounded w-3/4 mb-2" />
+                  <div className="h-3 bg-secondary rounded w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="text-center py-12">
+              <Package className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
+              <p className="text-muted-foreground">No hay productos disponibles</p>
+              <p className="text-muted-foreground/60 text-sm">Agrega productos desde el inventario</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredProducts.map((product, index) => (
               <button
                 key={product.id}
                 onClick={() => addToCart(product)}
                 className="glass-card rounded-xl p-4 text-left hover:border-primary/50 hover:shadow-glow transition-all duration-200 animate-fade-in"
                 style={{ animationDelay: `${index * 50}ms` }}
               >
-                <div className="w-full aspect-square rounded-lg bg-secondary mb-3 flex items-center justify-center">
-                  <Package className="h-12 w-12 text-muted-foreground/50" />
+                <div className="w-full aspect-square rounded-lg bg-secondary mb-3 flex items-center justify-center overflow-hidden">
+                  {product.imagen_url ? (
+                    <img src={product.imagen_url} alt={product.nombre} className="w-full h-full object-cover" />
+                  ) : (
+                    <Package className="h-12 w-12 text-muted-foreground/50" />
+                  )}
                 </div>
                 <h3 className="font-medium text-foreground text-sm mb-1 line-clamp-2">
-                  {product.name}
+                  {product.nombre}
                 </h3>
-                <p className="text-xs text-muted-foreground mb-2">{product.category}</p>
+                <p className="text-xs text-muted-foreground mb-2">{categoryLabels[product.categoria]}</p>
                 <div className="flex items-center justify-between">
                   <span className="text-lg font-bold text-primary">
-                    ${product.price.toFixed(2)}
+                    ${product.precio.toFixed(2)}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     Stock: {product.stock}
                   </span>
                 </div>
               </button>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Cart Section */}
