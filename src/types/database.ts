@@ -16,6 +16,8 @@ export type ProductType = 'insumo' | 'producto_final'
 
 export type MesaStatus = 'libre' | 'ocupada' | 'cerrada'
 
+export type ClienteType = 'presencial' | 'online'
+
 export interface Database {
   public: {
     Tables: {
@@ -24,6 +26,8 @@ export interface Database {
           id: string
           nombre: string
           direccion: string | null
+          email: string | null
+          telefono: string | null
           movil: string | null
           logo_url: string | null
           web: string | null
@@ -35,6 +39,8 @@ export interface Database {
           id?: string
           nombre: string
           direccion?: string | null
+          email?: string | null
+          telefono?: string | null
           movil?: string | null
           logo_url?: string | null
           web?: string | null
@@ -46,6 +52,8 @@ export interface Database {
           id?: string
           nombre?: string
           direccion?: string | null
+          email?: string | null
+          telefono?: string | null
           movil?: string | null
           logo_url?: string | null
           web?: string | null
@@ -173,11 +181,55 @@ export interface Database {
           created_at?: string
         }
       }
+      agregos: {
+        Row: {
+          id: string
+          nombre: string
+          insumo_id: string
+          precio_adicional: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          nombre: string
+          insumo_id: string
+          precio_adicional: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          nombre?: string
+          insumo_id?: string
+          precio_adicional?: number
+          created_at?: string
+        }
+      }
+      producto_agregos: {
+        Row: {
+          id: string
+          producto_id: string
+          agrego_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          producto_id: string
+          agrego_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          producto_id?: string
+          agrego_id?: string
+          created_at?: string
+        }
+      }
       ventas: {
         Row: {
           id: string
           punto_venta_id: string
           vendedor_id: string
+          cliente_id: string | null
           mesa_id: string | null
           subtotal: number
           impuesto: number
@@ -190,6 +242,7 @@ export interface Database {
           id?: string
           punto_venta_id: string
           vendedor_id: string
+          cliente_id?: string | null
           mesa_id?: string | null
           subtotal: number
           impuesto: number
@@ -202,6 +255,7 @@ export interface Database {
           id?: string
           punto_venta_id?: string
           vendedor_id?: string
+          cliente_id?: string | null
           mesa_id?: string | null
           subtotal?: number
           impuesto?: number
@@ -278,6 +332,64 @@ export interface Database {
           updated_at?: string
         }
       }
+      cuentas_mesa: {
+        Row: {
+          id: string
+          mesa_id: string
+          estado: string
+          total: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          mesa_id: string
+          estado?: string
+          total?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          mesa_id?: string
+          estado?: string
+          total?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      detalle_cuenta: {
+        Row: {
+          id: string
+          cuenta_id: string
+          producto_id: string
+          cantidad: number
+          precio_unitario: number
+          subtotal: number
+          agregos: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          cuenta_id: string
+          producto_id: string
+          cantidad: number
+          precio_unitario: number
+          subtotal: number
+          agregos?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          cuenta_id?: string
+          producto_id?: string
+          cantidad?: number
+          precio_unitario?: number
+          subtotal?: number
+          agregos?: string | null
+          created_at?: string
+        }
+      }
       clientes: {
         Row: {
           id: string
@@ -285,6 +397,8 @@ export interface Database {
           email: string | null
           telefono: string | null
           direccion: string | null
+          tipo: ClienteType
+          punto_venta_id: string | null
           created_at: string
           updated_at: string
         }
@@ -294,6 +408,8 @@ export interface Database {
           email?: string | null
           telefono?: string | null
           direccion?: string | null
+          tipo?: ClienteType
+          punto_venta_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -303,6 +419,8 @@ export interface Database {
           email?: string | null
           telefono?: string | null
           direccion?: string | null
+          tipo?: ClienteType
+          punto_venta_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -322,6 +440,7 @@ export interface Database {
       product_category: ProductCategory
       product_type: ProductType
       mesa_status: MesaStatus
+      cliente_type: ClienteType
     }
   }
 }
@@ -332,7 +451,11 @@ export type Profile = Database['public']['Tables']['profiles']['Row']
 export type UserRole = Database['public']['Tables']['user_roles']['Row']
 export type Inventario = Database['public']['Tables']['inventario']['Row']
 export type Receta = Database['public']['Tables']['recetas']['Row']
+export type Agrego = Database['public']['Tables']['agregos']['Row']
+export type ProductoAgrego = Database['public']['Tables']['producto_agregos']['Row']
 export type Venta = Database['public']['Tables']['ventas']['Row']
 export type VentaItem = Database['public']['Tables']['venta_items']['Row']
 export type Mesa = Database['public']['Tables']['mesas']['Row']
+export type CuentaMesa = Database['public']['Tables']['cuentas_mesa']['Row']
+export type DetalleCuenta = Database['public']['Tables']['detalle_cuenta']['Row']
 export type Cliente = Database['public']['Tables']['clientes']['Row']
