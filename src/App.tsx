@@ -7,6 +7,10 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import Ventas from "./pages/Ventas";
+import Reportes from "./pages/Reportes";
+import AdminUsers from "./pages/AdminUsers";
+import AdminStores from "./pages/AdminStores";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +29,38 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ventas"
+              element={
+                <ProtectedRoute>
+                  <Ventas />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reportes"
+              element={
+                <ProtectedRoute>
+                  <Reportes />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute>
+                  <AdminUsers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/stores"
+              element={
+                <ProtectedRoute>
+                  <AdminStores />
                 </ProtectedRoute>
               }
             />
