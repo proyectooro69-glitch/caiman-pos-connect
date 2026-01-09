@@ -71,7 +71,7 @@ export const useUserRole = (): UserRoleData => {
     role,
     storeId,
     loading,
-    isAdmin: role === 'admin',
+    isAdmin: role === 'administrador',
     isSupervisor: role === 'supervisor',
     isVendedor: role === 'vendedor',
   };
