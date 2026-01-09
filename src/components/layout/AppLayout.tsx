@@ -26,7 +26,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               <Skeleton className="h-6 w-24" />
             ) : (
               <span className="text-sm text-muted-foreground">
-                {role === 'admin' && '🛡️ Modo Administrador'}
+                {role === 'administrador' && '🛡️ Modo Administrador'}
                 {role === 'supervisor' && '📊 Modo Supervisor'}
                 {role === 'vendedor' && '🛒 Modo Vendedor'}
                 {!role && '👤 Sin rol asignado'}

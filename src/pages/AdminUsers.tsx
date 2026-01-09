@@ -140,7 +140,7 @@ export default function AdminUsers() {
       toast.error('Completa todos los campos requeridos');
       return;
     }
-    if (newUser.role !== 'admin' && !newUser.store_id) {
+    if (newUser.role !== 'administrador' && !newUser.store_id) {
       toast.error('Selecciona un punto de venta para el usuario');
       return;
     }
@@ -149,7 +149,7 @@ export default function AdminUsers() {
 
   const getRoleBadge = (role: AppRole | undefined) => {
     const config = {
-      admin: { label: 'Admin', className: 'bg-primary/20 text-primary' },
+      administrador: { label: 'Admin', className: 'bg-primary/20 text-primary' },
       supervisor: { label: 'Supervisor', className: 'bg-warning/20 text-warning' },
       vendedor: { label: 'Vendedor', className: 'bg-accent/20 text-accent' },
     };
@@ -237,11 +237,11 @@ export default function AdminUsers() {
                     <SelectContent>
                       <SelectItem value="vendedor">Vendedor</SelectItem>
                       <SelectItem value="supervisor">Supervisor</SelectItem>
-                      <SelectItem value="admin">Administrador</SelectItem>
+                      <SelectItem value="administrador">Administrador</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                {newUser.role !== 'admin' && (
+                {newUser.role !== 'administrador' && (
                   <div className="space-y-2">
                     <Label>Punto de Venta</Label>
                     <Select

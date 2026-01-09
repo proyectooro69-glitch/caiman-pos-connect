@@ -123,7 +123,7 @@ export default function Ventas() {
             <p className="text-muted-foreground">
               {role === 'vendedor' && 'Registra ventas y gestiona tu caja'}
               {role === 'supervisor' && 'Supervisa y registra ventas'}
-              {role === 'admin' && 'Vista completa del punto de venta'}
+              {role === 'administrador' && 'Vista completa del punto de venta'}
             </p>
           </div>
           <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
