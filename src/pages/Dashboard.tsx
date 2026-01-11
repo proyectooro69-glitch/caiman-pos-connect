@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -10,6 +11,8 @@ import {
   CreditCard, 
   Banknote,
   Package,
+  Store,
+  Settings,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,6 +47,8 @@ const Dashboard = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>("Todos");
   const [products, setProducts] = useState<Inventario[]>([]);
   const [loading, setLoading] = useState(true);
+  const [storesCount, setStoresCount] = useState<number | null>(null);
+  const [storesCountLoading, setStoresCountLoading] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const { role, isAdmin, isSupervisor, isVendedor } = useUserRole();
@@ -71,6 +76,26 @@ const Dashboard = () => {
 
     fetchProducts();
   }, [toast]);
+
+  // Admin: check if there is at least one store
+  useEffect(() => {
+    const fetchStoresCount = async () => {
+      if (!isAdmin) return;
+      setStoresCountLoading(true);
+      const { count, error } = await supabase
+        .from('puntos_venta')
+        .select('id', { head: true, count: 'exact' });
+
+      if (error) {
+        console.error('Error fetching stores count:', error);
+      } else {
+        setStoresCount(count ?? 0);
+      }
+      setStoresCountLoading(false);
+    };
+
+    fetchStoresCount();
+  }, [isAdmin]);
 
   // Get unique categories from products
   const categories = ["Todos", ...Object.values(categoryLabels)];
@@ -136,6 +161,29 @@ const Dashboard = () => {
             {new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </Badge>
         </div>
+
+        {/* Admin initial setup */}
+        {isAdmin && !storesCountLoading && storesCount === 0 && (
+          <Card className="glass-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5 text-primary" />
+                Configuración Inicial
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="text-sm text-muted-foreground">
+                Aún no tienes ningún punto de venta creado. Crea el primero para habilitar la operación.
+              </div>
+              <Button className="gradient-primary" asChild>
+                <Link to="/admin/stores?setup=1">
+                  <Store className="h-4 w-4 mr-2" />
+                  Crear mi primera tienda
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Products Section */}

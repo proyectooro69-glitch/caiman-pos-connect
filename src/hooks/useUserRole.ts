@@ -28,15 +28,21 @@ export const useUserRole = (): UserRoleData => {
       }
 
       try {
-        // Fetch role from user_roles table
-        const { data: roleData, error: roleError } = await supabase
+        // Fetch roles from user_roles table (can be multiple rows)
+        const { data: rolesData, error: rolesError } = await supabase
           .from('user_roles')
           .select('role, store_id')
-          .eq('user_id', user.id)
-          .maybeSingle();
+          .eq('user_id', user.id);
 
-        if (roleError) {
-          console.error('Error fetching user role:', roleError);
+        if (rolesError) {
+          console.error('Error fetching user role:', rolesError);
+        }
+
+        if (!rolesData || rolesData.length === 0) {
+          // If this returns empty but you *know* there is a row, it's almost always missing RLS SELECT policy.
+          console.warn(
+            '[useUserRole] user_roles returned 0 rows. If you inserted a role, add an RLS policy allowing users to SELECT their own user_roles row.'
+          );
         }
 
         // Fetch store_id from profiles as fallback
@@ -50,11 +56,17 @@ export const useUserRole = (): UserRoleData => {
           console.error('Error fetching profile:', profileError);
         }
 
-        const userRole = roleData ? (roleData as { role: AppRole; store_id: string | null }).role : null;
-        const userStoreId = roleData 
-          ? (roleData as { role: AppRole; store_id: string | null }).store_id 
-          : (profileData as { punto_venta_id: string | null } | null)?.punto_venta_id ?? null;
-        
+        // Pick highest priority role if multiple exist
+        const roles = (rolesData ?? []) as Array<{ role: AppRole; store_id: string | null }>;
+        const priority: AppRole[] = ['administrador', 'supervisor', 'vendedor'];
+        const bestRole = priority.find((r) => roles.some((row) => row.role === r)) ?? null;
+        const bestRow = bestRole ? roles.find((row) => row.role === bestRole) : roles[0];
+
+        const userRole: AppRole | null = bestRow?.role ?? null;
+        const userStoreId = bestRow?.store_id ??
+          (profileData as { punto_venta_id: string | null } | null)?.punto_venta_id ??
+          null;
+
         setRole(userRole);
         setStoreId(userStoreId);
       } catch (error) {

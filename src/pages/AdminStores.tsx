@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -30,6 +31,7 @@ import { toast } from "sonner";
 
 export default function AdminStores() {
   const { isAdmin, loading: roleLoading } = useUserRole();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newStore, setNewStore] = useState({
@@ -54,6 +56,14 @@ export default function AdminStores() {
     },
     enabled: !roleLoading && isAdmin,
   });
+
+  // If coming from setup CTA and there are no stores yet, open the create dialog automatically
+  useEffect(() => {
+    const shouldAutoOpen = searchParams.get('setup') === '1';
+    if (!roleLoading && isAdmin && !isLoading && stores.length === 0 && shouldAutoOpen) {
+      setIsDialogOpen(true);
+    }
+  }, [searchParams, roleLoading, isAdmin, isLoading, stores.length]);
 
   // Create store mutation
   const createStoreMutation = useMutation({
