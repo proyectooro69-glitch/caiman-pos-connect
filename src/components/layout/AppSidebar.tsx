@@ -44,24 +44,24 @@ export function AppSidebar() {
   // Menu items by role
   const getMenuItems = () => {
     const baseItems = [
-      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, roles: ['admin', 'supervisor', 'vendedor'] },
+      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, roles: ['administrador', 'supervisor', 'vendedor'] },
     ];
 
     const vendedorItems = [
-      { title: "Punto de Venta", url: "/ventas", icon: ShoppingCart, roles: ['admin', 'supervisor', 'vendedor'] },
-      { title: "Mesas", url: "/mesas", icon: ChefHat, roles: ['admin', 'supervisor', 'vendedor'] },
+      { title: "Punto de Venta", url: "/ventas", icon: ShoppingCart, roles: ['administrador', 'supervisor', 'vendedor'] },
+      { title: "Mesas", url: "/mesas", icon: ChefHat, roles: ['administrador', 'supervisor', 'vendedor'] },
     ];
 
     const supervisorItems = [
-      { title: "Inventario", url: "/inventario", icon: Package, roles: ['admin', 'supervisor'] },
-      { title: "Reportes", url: "/reportes", icon: BarChart3, roles: ['admin', 'supervisor'] },
-      { title: "Clientes", url: "/clientes", icon: Users, roles: ['admin', 'supervisor'] },
+      { title: "Inventario", url: "/inventario", icon: Package, roles: ['administrador', 'supervisor'] },
+      { title: "Reportes", url: "/reportes", icon: BarChart3, roles: ['administrador', 'supervisor'] },
+      { title: "Clientes", url: "/clientes", icon: Users, roles: ['administrador', 'supervisor'] },
     ];
 
     const adminItems = [
-      { title: "Puntos de Venta", url: "/admin/stores", icon: Store, roles: ['admin'] },
-      { title: "Gestión Usuarios", url: "/admin/users", icon: UserCog, roles: ['admin'] },
-      { title: "Configuración", url: "/admin/settings", icon: Settings, roles: ['admin'] },
+      { title: "Puntos de Venta", url: "/admin/stores", icon: Store, roles: ['administrador'] },
+      { title: "Gestión Usuarios", url: "/admin/users", icon: UserCog, roles: ['administrador'] },
+      { title: "Configuración", url: "/admin/settings", icon: Settings, roles: ['administrador'] },
     ];
 
     return [...baseItems, ...vendedorItems, ...supervisorItems, ...adminItems];
@@ -76,7 +76,7 @@ export function AppSidebar() {
     if (loading) return <Skeleton className="h-5 w-16" />;
     
     const roleConfig = {
-      admin: { label: 'Super Admin', className: 'bg-primary/20 text-primary border-primary/30' },
+      administrador: { label: 'Super Admin', className: 'bg-primary/20 text-primary border-primary/30' },
       supervisor: { label: 'Supervisor', className: 'bg-warning/20 text-warning border-warning/30' },
       vendedor: { label: 'Vendedor', className: 'bg-accent/20 text-accent border-accent/30' },
     };
