@@ -99,18 +99,50 @@ export interface Database {
           id: string
           user_id: string
           role: AppRole
+          store_id: string | null
           created_at: string
         }
         Insert: {
           id?: string
           user_id: string
           role: AppRole
+          store_id?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           user_id?: string
           role?: AppRole
+          store_id?: string | null
+          created_at?: string
+        }
+      }
+      invitations: {
+        Row: {
+          id: string
+          email: string
+          role: AppRole
+          store_id: string | null
+          invited_by: string | null
+          used_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          email: string
+          role: AppRole
+          store_id?: string | null
+          invited_by?: string | null
+          used_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          role?: AppRole
+          store_id?: string | null
+          invited_by?: string | null
+          used_at?: string | null
           created_at?: string
         }
       }
@@ -434,6 +466,13 @@ export interface Database {
         }
         Returns: boolean
       }
+      cleanup_temp_stores: {
+        Args: {
+          p_user_id: string
+          p_new_store_id: string
+        }
+        Returns: void
+      }
     }
     Enums: {
       app_role: AppRole
@@ -449,6 +488,7 @@ export interface Database {
 export type PuntoVenta = Database['public']['Tables']['puntos_venta']['Row']
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type UserRole = Database['public']['Tables']['user_roles']['Row']
+export type Invitation = Database['public']['Tables']['invitations']['Row']
 export type Inventario = Database['public']['Tables']['inventario']['Row']
 export type Receta = Database['public']['Tables']['recetas']['Row']
 export type Agrego = Database['public']['Tables']['agregos']['Row']
