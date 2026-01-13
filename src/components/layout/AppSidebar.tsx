@@ -9,7 +9,8 @@ import {
   UserCog,
   LogOut,
   ChefHat,
-  UserPlus
+  UserPlus,
+  CreditCard
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -61,6 +62,7 @@ export function AppSidebar() {
 
     const adminItems = [
       { title: "Puntos de Venta", url: "/admin/stores", icon: Store, roles: ['administrador'] },
+      { title: "Suscripciones", url: "/admin/subscriptions", icon: CreditCard, roles: ['administrador', 'supervisor'] },
       { title: "Invitaciones", url: "/admin/invitations", icon: UserPlus, roles: ['administrador'] },
       { title: "Gestión Usuarios", url: "/admin/users", icon: UserCog, roles: ['administrador'] },
       { title: "Configuración", url: "/admin/settings", icon: Settings, roles: ['administrador'] },
