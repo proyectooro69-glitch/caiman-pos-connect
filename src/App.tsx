@@ -13,6 +13,7 @@ import Inventario from "./pages/Inventario";
 import AdminUsers from "./pages/AdminUsers";
 import AdminStores from "./pages/AdminStores";
 import AdminInvitations from "./pages/AdminInvitations";
+import AdminSubscriptions from "./pages/AdminSubscriptions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -79,6 +80,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AdminInvitations />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/subscriptions"
+              element={
+                <ProtectedRoute>
+                  <AdminSubscriptions />
                 </ProtectedRoute>
               }
             />

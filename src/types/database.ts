@@ -32,6 +32,7 @@ export interface Database {
           logo_url: string | null
           web: string | null
           imagen_url: string | null
+          fecha_vencimiento: string | null
           created_at: string
           updated_at: string
         }
@@ -45,6 +46,7 @@ export interface Database {
           logo_url?: string | null
           web?: string | null
           imagen_url?: string | null
+          fecha_vencimiento?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -58,8 +60,44 @@ export interface Database {
           logo_url?: string | null
           web?: string | null
           imagen_url?: string | null
+          fecha_vencimiento?: string | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      pagos_suscripcion: {
+        Row: {
+          id: string
+          store_id: string
+          monto: number
+          fecha_pago: string
+          meses_pagados: number
+          fecha_vencimiento: string
+          notas: string | null
+          registrado_por: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          store_id: string
+          monto: number
+          fecha_pago?: string
+          meses_pagados?: number
+          fecha_vencimiento: string
+          notas?: string | null
+          registrado_por?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          store_id?: string
+          monto?: number
+          fecha_pago?: string
+          meses_pagados?: number
+          fecha_vencimiento?: string
+          notas?: string | null
+          registrado_por?: string | null
+          created_at?: string
         }
       }
       profiles: {
@@ -473,6 +511,15 @@ export interface Database {
         }
         Returns: void
       }
+      registrar_pago_suscripcion: {
+        Args: {
+          p_store_id: string
+          p_monto: number
+          p_meses: number
+          p_notas: string | null
+        }
+        Returns: string
+      }
     }
     Enums: {
       app_role: AppRole
@@ -499,3 +546,4 @@ export type Mesa = Database['public']['Tables']['mesas']['Row']
 export type CuentaMesa = Database['public']['Tables']['cuentas_mesa']['Row']
 export type DetalleCuenta = Database['public']['Tables']['detalle_cuenta']['Row']
 export type Cliente = Database['public']['Tables']['clientes']['Row']
+export type PagoSuscripcion = Database['public']['Tables']['pagos_suscripcion']['Row']

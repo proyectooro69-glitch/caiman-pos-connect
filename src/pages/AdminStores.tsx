@@ -25,9 +25,30 @@ import {
   Mail, 
   Globe,
   Users,
-  AlertTriangle
+  AlertTriangle,
+  Calendar
 } from "lucide-react";
 import { toast } from "sonner";
+import { differenceInDays, parseISO, format } from "date-fns";
+import { es } from "date-fns/locale";
+
+const getSubscriptionStatus = (fechaVencimiento: string | null) => {
+  if (!fechaVencimiento) {
+    return { status: 'sin_suscripcion', label: 'Sin suscripción', badgeClass: 'bg-muted text-muted-foreground' };
+  }
+  
+  const today = new Date();
+  const expDate = parseISO(fechaVencimiento);
+  const days = differenceInDays(expDate, today);
+  
+  if (days < 0) {
+    return { status: 'vencido', label: 'Vencido', badgeClass: 'bg-destructive text-destructive-foreground' };
+  } else if (days <= 7) {
+    return { status: 'por_vencer', label: `Vence en ${days}d`, badgeClass: 'bg-warning text-warning-foreground' };
+  } else {
+    return { status: 'activo', label: 'Activo', badgeClass: 'bg-success text-success-foreground' };
+  }
+};
 
 export default function AdminStores() {
   const { isAdmin, loading: roleLoading } = useUserRole();
@@ -222,63 +243,82 @@ export default function AdminStores() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {stores?.map((store) => (
-              <Card key={store.id} className="glass-card hover:border-primary/50 transition-all duration-200">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <Store className="h-6 w-6 text-primary" />
+            {stores?.map((store) => {
+              const storeData = store as any;
+              const subscriptionStatus = getSubscriptionStatus(storeData.fecha_vencimiento);
+              const isExpired = subscriptionStatus.status === 'vencido';
+              
+              return (
+                <Card 
+                  key={store.id} 
+                  className={`glass-card hover:border-primary/50 transition-all duration-200 ${
+                    isExpired ? 'border-destructive/50 bg-destructive/5' : ''
+                  }`}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${
+                          isExpired ? 'bg-destructive/10' : 'bg-primary/10'
+                        }`}>
+                          <Store className={`h-6 w-6 ${isExpired ? 'text-destructive' : 'text-primary'}`} />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">{store.nombre}</CardTitle>
+                          <Badge className={subscriptionStatus.badgeClass + ' mt-1'}>
+                            {subscriptionStatus.label}
+                          </Badge>
+                        </div>
                       </div>
-                      <div>
-                        <CardTitle className="text-lg">{store.nombre}</CardTitle>
-                        <Badge variant="outline" className="bg-success/10 text-success border-success/20 mt-1">
-                          Activo
-                        </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {storeData.fecha_vencimiento && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4 flex-shrink-0" />
+                        <span>Vence: {format(parseISO(storeData.fecha_vencimiento), "d MMM yyyy", { locale: es })}</span>
+                      </div>
+                    )}
+                    {store.direccion && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="h-4 w-4 flex-shrink-0" />
+                        <span className="truncate">{store.direccion}</span>
+                      </div>
+                    )}
+                    {store.telefono && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Phone className="h-4 w-4 flex-shrink-0" />
+                        <span>{store.telefono}</span>
+                      </div>
+                    )}
+                    {store.email && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Mail className="h-4 w-4 flex-shrink-0" />
+                        <span className="truncate">{store.email}</span>
+                      </div>
+                    )}
+                    {store.web && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Globe className="h-4 w-4 flex-shrink-0" />
+                        <a href={store.web} target="_blank" rel="noopener noreferrer" className="truncate hover:text-primary">
+                          {store.web}
+                        </a>
+                      </div>
+                    )}
+                    
+                    <div className="pt-3 border-t border-border">
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Users className="h-4 w-4" />
+                          <span>Usuarios</span>
+                        </div>
+                        <Badge variant="secondary">0</Badge>
                       </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {store.direccion && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <MapPin className="h-4 w-4 flex-shrink-0" />
-                      <span className="truncate">{store.direccion}</span>
-                    </div>
-                  )}
-                  {store.telefono && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Phone className="h-4 w-4 flex-shrink-0" />
-                      <span>{store.telefono}</span>
-                    </div>
-                  )}
-                  {store.email && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Mail className="h-4 w-4 flex-shrink-0" />
-                      <span className="truncate">{store.email}</span>
-                    </div>
-                  )}
-                  {store.web && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Globe className="h-4 w-4 flex-shrink-0" />
-                      <a href={store.web} target="_blank" rel="noopener noreferrer" className="truncate hover:text-primary">
-                        {store.web}
-                      </a>
-                    </div>
-                  )}
-                  
-                  <div className="pt-3 border-t border-border">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <Users className="h-4 w-4" />
-                        <span>Usuarios</span>
-                      </div>
-                      <Badge variant="secondary">0</Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
