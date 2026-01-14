@@ -14,6 +14,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -39,16 +40,18 @@ import {
 import { 
   Store, 
   CreditCard, 
-  Calendar,
   AlertTriangle,
   CheckCircle,
   XCircle,
   Clock,
-  History
+  History,
+  Download,
+  MessageCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, differenceInDays, parseISO, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
+import { downloadReceiptPDF } from "@/utils/generateReceiptPDF";
 
 interface StoreWithSubscription {
   id: string;
@@ -63,21 +66,24 @@ interface StoreWithSubscription {
   } | null;
 }
 
-interface HistorialPago {
-  id: string;
+interface PaymentResult {
+  paymentId: string;
+  newExpirationDate: string;
+  storeName: string;
+  storeEmail: string | null;
+  storeTelefono: string | null;
   monto: number;
-  meses_pagados: number;
-  fecha_pago: string;
-  fecha_vencimiento_anterior: string | null;
-  fecha_vencimiento_nueva: string;
-  notas: string | null;
+  meses: number;
+  notas: string;
 }
 
 export default function AdminSubscriptions() {
   const { isAdmin, isSupervisor, loading: roleLoading } = useUserRole();
   const queryClient = useQueryClient();
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
   const [selectedStore, setSelectedStore] = useState<StoreWithSubscription | null>(null);
+  const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null);
   const [paymentData, setPaymentData] = useState({
     monto: '',
     meses: '1',
@@ -90,7 +96,6 @@ export default function AdminSubscriptions() {
   const { data: stores = [], isLoading } = useQuery({
     queryKey: ['stores-subscriptions'],
     queryFn: async () => {
-      // Get stores
       const { data: storesData, error: storesError } = await supabase
         .from('puntos_venta')
         .select('id, nombre, email, telefono')
@@ -98,7 +103,6 @@ export default function AdminSubscriptions() {
 
       if (storesError) throw storesError;
 
-      // Get subscriptions
       const { data: suscripciones } = await supabase
         .from('suscripciones')
         .select('*');
@@ -108,7 +112,6 @@ export default function AdminSubscriptions() {
         suscripcionMap.set(s.store_id, s);
       });
 
-      // Also check puntos_venta.fecha_vencimiento as fallback
       const result: StoreWithSubscription[] = storesData.map((store: any) => {
         const sub = suscripcionMap.get(store.id);
         return {
@@ -130,50 +133,11 @@ export default function AdminSubscriptions() {
     enabled: !roleLoading && canAccess,
   });
 
-  // Fetch payment history for a store
-  const { data: paymentHistory = [] } = useQuery({
-    queryKey: ['payment-history', selectedStore?.id],
-    queryFn: async () => {
-      if (!selectedStore?.id) return [];
-      
-      const { data, error } = await supabase
-        .from('historial_pagos')
-        .select('*')
-        .eq('store_id', selectedStore.id)
-        .order('fecha_pago', { ascending: false })
-        .limit(10);
-
-      if (error) {
-        // Fallback to pagos_suscripcion if historial_pagos doesn't exist
-        const { data: fallbackData } = await supabase
-          .from('pagos_suscripcion')
-          .select('*')
-          .eq('store_id', selectedStore.id)
-          .order('fecha_pago', { ascending: false })
-          .limit(10);
-        
-        return (fallbackData || []).map((p: any) => ({
-          id: p.id,
-          monto: p.monto,
-          meses_pagados: p.meses_pagados,
-          fecha_pago: p.fecha_pago,
-          fecha_vencimiento_anterior: null,
-          fecha_vencimiento_nueva: p.fecha_vencimiento,
-          notas: p.notas
-        }));
-      }
-      
-      return data as HistorialPago[];
-    },
-    enabled: !!selectedStore?.id,
-  });
-
   // Register payment mutation
   const registerPaymentMutation = useMutation({
     mutationFn: async (data: { storeId: string; monto: number; meses: number; notas: string }) => {
       const hoy = new Date();
       
-      // Get or check existing subscription
       const { data: existingSub } = await (supabase as any)
         .from('suscripciones')
         .select('*')
@@ -190,7 +154,6 @@ export default function AdminSubscriptions() {
           : hoy;
         nuevaFecha = addMonths(baseDate, data.meses);
 
-        // Update subscription
         await (supabase as any)
           .from('suscripciones')
           .update({
@@ -202,7 +165,6 @@ export default function AdminSubscriptions() {
       } else {
         nuevaFecha = addMonths(hoy, data.meses);
         
-        // Create new subscription
         await (supabase as any)
           .from('suscripciones')
           .insert({
@@ -214,21 +176,20 @@ export default function AdminSubscriptions() {
           });
       }
 
-      // Also update puntos_venta for backwards compatibility
       await (supabase as any)
         .from('puntos_venta')
         .update({ fecha_vencimiento: format(nuevaFecha, 'yyyy-MM-dd') })
         .eq('id', data.storeId);
 
-      // Record in historial_pagos
       const { data: subForHistory } = await (supabase as any)
         .from('suscripciones')
         .select('id')
         .eq('store_id', data.storeId)
         .single();
 
+      let paymentId = '';
       if (subForHistory) {
-        await (supabase as any)
+        const { data: historialRecord } = await (supabase as any)
           .from('historial_pagos')
           .insert({
             suscripcion_id: subForHistory.id,
@@ -238,18 +199,37 @@ export default function AdminSubscriptions() {
             fecha_vencimiento_anterior: fechaAnterior,
             fecha_vencimiento_nueva: format(nuevaFecha, 'yyyy-MM-dd'),
             notas: data.notas || null
-          });
+          })
+          .select()
+          .single();
+        
+        if (historialRecord) {
+          paymentId = historialRecord.id;
+        }
       }
 
-      return true;
+      return {
+        paymentId,
+        newExpirationDate: format(nuevaFecha, 'yyyy-MM-dd')
+      };
     },
-    onSuccess: () => {
-      toast.success('Pago registrado exitosamente');
+    onSuccess: (result) => {
+      if (selectedStore) {
+        setPaymentResult({
+          paymentId: result.paymentId,
+          newExpirationDate: result.newExpirationDate,
+          storeName: selectedStore.nombre,
+          storeEmail: selectedStore.email,
+          storeTelefono: selectedStore.telefono,
+          monto: parseFloat(paymentData.monto),
+          meses: parseInt(paymentData.meses),
+          notas: paymentData.notas
+        });
+      }
       setIsPaymentDialogOpen(false);
-      setSelectedStore(null);
-      setPaymentData({ monto: '', meses: '1', notas: '' });
+      setIsSuccessDialogOpen(true);
       queryClient.invalidateQueries({ queryKey: ['stores-subscriptions'] });
-      queryClient.invalidateQueries({ queryKey: ['payment-history'] });
+      queryClient.invalidateQueries({ queryKey: ['store-payment-history'] });
     },
     onError: (error: Error) => {
       toast.error(`Error: ${error.message}`);
@@ -276,6 +256,33 @@ export default function AdminSubscriptions() {
     });
   };
 
+  const handleDownloadReceipt = () => {
+    if (!paymentResult) return;
+    
+    downloadReceiptPDF({
+      paymentId: paymentResult.paymentId,
+      storeName: paymentResult.storeName,
+      storeEmail: paymentResult.storeEmail,
+      amount: paymentResult.monto,
+      monthsPaid: paymentResult.meses,
+      newExpirationDate: paymentResult.newExpirationDate,
+      notes: paymentResult.notas
+    });
+  };
+
+  const handleSendWhatsApp = () => {
+    if (!paymentResult) return;
+    
+    const phone = paymentResult.storeTelefono?.replace(/\D/g, '') || '';
+    const expirationFormatted = format(parseISO(paymentResult.newExpirationDate), "d 'de' MMMM, yyyy", { locale: es });
+    
+    const message = encodeURIComponent(
+      `Hola, adjuntamos el recibo de pago de su suscripción a Caiman POS Connect. Su nuevo vencimiento es el ${expirationFormatted}.`
+    );
+    
+    window.open(`https://wa.me/52${phone}?text=${message}`, '_blank');
+  };
+
   const getSubscriptionStatus = (store: StoreWithSubscription) => {
     const fechaVencimiento = store.suscripcion?.fecha_vencimiento;
     
@@ -298,6 +305,7 @@ export default function AdminSubscriptions() {
 
   const openPaymentDialog = (store: StoreWithSubscription) => {
     setSelectedStore(store);
+    setPaymentData({ monto: '', meses: '1', notas: '' });
     setIsPaymentDialogOpen(true);
   };
 
@@ -309,6 +317,13 @@ export default function AdminSubscriptions() {
       : new Date();
     const newDate = addMonths(baseDate, parseInt(paymentData.meses));
     return format(newDate, "d 'de' MMMM, yyyy", { locale: es });
+  };
+
+  const closeSuccessDialog = () => {
+    setIsSuccessDialogOpen(false);
+    setPaymentResult(null);
+    setSelectedStore(null);
+    setPaymentData({ monto: '', meses: '1', notas: '' });
   };
 
   if (roleLoading) {
@@ -331,7 +346,6 @@ export default function AdminSubscriptions() {
     );
   }
 
-  // Sort stores: expired first, then by expiration date
   const sortedStores = [...stores].sort((a, b) => {
     const statusA = getSubscriptionStatus(a);
     const statusB = getSubscriptionStatus(b);
@@ -351,8 +365,8 @@ export default function AdminSubscriptions() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Gestión de Cobros</h1>
-          <p className="text-muted-foreground">Administra los pagos y suscripciones de las tiendas</p>
+          <h1 className="text-3xl font-bold text-foreground">Control de Suscripciones</h1>
+          <p className="text-muted-foreground">Gestiona los cobros y pagos de suscripciones</p>
         </div>
 
         {/* Summary Cards */}
@@ -507,7 +521,6 @@ export default function AdminSubscriptions() {
               <DialogTitle>Registrar Pago - {selectedStore?.nombre}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              {/* Current Status */}
               {selectedStore && (
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-sm text-muted-foreground">Estado actual:</p>
@@ -521,7 +534,7 @@ export default function AdminSubscriptions() {
               )}
 
               <div className="space-y-2">
-                <Label>Monto Pagado *</Label>
+                <Label>Monto ($) *</Label>
                 <Input
                   type="number"
                   placeholder="0.00"
@@ -531,7 +544,7 @@ export default function AdminSubscriptions() {
               </div>
 
               <div className="space-y-2">
-                <Label>Meses a Agregar</Label>
+                <Label>Meses a Pagar</Label>
                 <Select
                   value={paymentData.meses}
                   onValueChange={(value) => setPaymentData({ ...paymentData, meses: value })}
@@ -540,11 +553,10 @@ export default function AdminSubscriptions() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">1 mes</SelectItem>
-                    <SelectItem value="2">2 meses</SelectItem>
-                    <SelectItem value="3">3 meses</SelectItem>
-                    <SelectItem value="6">6 meses</SelectItem>
-                    <SelectItem value="12">12 meses</SelectItem>
+                    <SelectItem value="1">1 Mes</SelectItem>
+                    <SelectItem value="3">3 Meses</SelectItem>
+                    <SelectItem value="6">6 Meses</SelectItem>
+                    <SelectItem value="12">12 Meses (1 Año)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -552,13 +564,12 @@ export default function AdminSubscriptions() {
               <div className="space-y-2">
                 <Label>Notas (opcional)</Label>
                 <Input
-                  placeholder="Ej: Pago con transferencia"
+                  placeholder="Ej: Pago con transferencia bancaria"
                   value={paymentData.notas}
                   onChange={(e) => setPaymentData({ ...paymentData, notas: e.target.value })}
                 />
               </div>
 
-              {/* New expiration preview */}
               <div className="p-3 rounded-lg bg-success/10 border border-success/20">
                 <p className="text-sm text-muted-foreground">Nueva fecha de vencimiento:</p>
                 <p className="font-medium text-success">{getExpectedNewDate()}</p>
@@ -569,9 +580,70 @@ export default function AdminSubscriptions() {
                 onClick={handleRegisterPayment}
                 disabled={registerPaymentMutation.isPending}
               >
-                {registerPaymentMutation.isPending ? 'Registrando...' : 'Confirmar Pago'}
+                {registerPaymentMutation.isPending ? 'Registrando...' : 'Guardar Pago'}
               </Button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Success Dialog with PDF and WhatsApp options */}
+        <Dialog open={isSuccessDialogOpen} onOpenChange={closeSuccessDialog}>
+          <DialogContent className="bg-card border-border max-w-md">
+            <DialogHeader>
+              <div className="mx-auto w-16 h-16 rounded-full bg-success/20 flex items-center justify-center mb-4">
+                <CheckCircle className="h-8 w-8 text-success" />
+              </div>
+              <DialogTitle className="text-center text-xl">¡Pago Registrado!</DialogTitle>
+            </DialogHeader>
+            
+            {paymentResult && (
+              <div className="space-y-4 py-4">
+                <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Folio:</span>
+                    <span className="font-mono font-medium">{paymentResult.paymentId.substring(0, 8).toUpperCase()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tienda:</span>
+                    <span className="font-medium">{paymentResult.storeName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Monto:</span>
+                    <span className="font-medium">${paymentResult.monto.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Período:</span>
+                    <span className="font-medium">{paymentResult.meses} {paymentResult.meses === 1 ? 'mes' : 'meses'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Próximo vencimiento:</span>
+                    <span className="font-medium text-success">
+                      {format(parseISO(paymentResult.newExpirationDate), "d 'de' MMMM, yyyy", { locale: es })}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                  <Button onClick={handleDownloadReceipt} className="w-full gap-2">
+                    <Download className="h-4 w-4" />
+                    Descargar Recibo PDF
+                  </Button>
+                  
+                  {paymentResult.storeTelefono && (
+                    <Button variant="outline" onClick={handleSendWhatsApp} className="w-full gap-2">
+                      <MessageCircle className="h-4 w-4" />
+                      Enviar por WhatsApp
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            <DialogFooter>
+              <Button variant="ghost" onClick={closeSuccessDialog} className="w-full">
+                Cerrar
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
@@ -584,7 +656,6 @@ function StorePaymentHistory({ storeId }: { storeId: string }) {
   const { data: history = [], isLoading } = useQuery({
     queryKey: ['store-payment-history', storeId],
     queryFn: async () => {
-      // Try historial_pagos first
       const { data, error } = await supabase
         .from('historial_pagos')
         .select('*')
@@ -593,7 +664,6 @@ function StorePaymentHistory({ storeId }: { storeId: string }) {
         .limit(5);
 
       if (error) {
-        // Fallback to pagos_suscripcion
         const { data: fallbackData } = await supabase
           .from('pagos_suscripcion')
           .select('*')

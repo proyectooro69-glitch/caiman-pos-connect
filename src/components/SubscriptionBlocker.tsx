@@ -1,4 +1,4 @@
-import { AlertTriangle, Phone, Mail } from 'lucide-react';
+import { AlertTriangle, Phone, MessageCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -10,7 +10,9 @@ interface SubscriptionBlockerProps {
 }
 
 export const SubscriptionBlocker = ({ children }: SubscriptionBlockerProps) => {
-  const { isExpired, fechaVencimiento, loading, estado } = useSubscription();
+  const { isExpired, fechaVencimiento, loading } = useSubscription();
+
+  const supportPhone = '5551234567'; // Número de soporte
 
   if (loading) {
     return (
@@ -24,49 +26,60 @@ export const SubscriptionBlocker = ({ children }: SubscriptionBlockerProps) => {
   }
 
   if (isExpired) {
+    const formattedDate = fechaVencimiento 
+      ? format(parseISO(fechaVencimiento), "d 'de' MMMM, yyyy", { locale: es })
+      : 'fecha desconocida';
+
+    const whatsappMessage = encodeURIComponent(
+      `Hola, mi suscripción a Caiman POS Connect ha vencido. Necesito ayuda para renovarla.`
+    );
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="max-w-md w-full border-destructive/50 bg-destructive/5">
-          <CardHeader className="text-center">
+        <Card className="max-w-lg w-full border-destructive/50 bg-destructive/5">
+          <CardHeader className="text-center pb-2">
             <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
               <AlertTriangle className="h-8 w-8 text-destructive" />
             </div>
             <CardTitle className="text-2xl text-destructive">
-              Suscripción Vencida
+              Servicio Suspendido
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 text-center">
-            <p className="text-muted-foreground">
-              Tu suscripción venció el{' '}
-              <span className="font-semibold text-foreground">
-                {fechaVencimiento 
-                  ? format(parseISO(fechaVencimiento), "d 'de' MMMM, yyyy", { locale: es })
-                  : 'fecha desconocida'
-                }
-              </span>
-            </p>
+          <CardContent className="space-y-6 text-center">
+            <div>
+              <p className="text-muted-foreground mb-2">
+                Tu suscripción a Caiman POS Connect ha expirado.
+              </p>
+              <div className="bg-card rounded-lg p-3 border">
+                <p className="text-sm text-muted-foreground">Fecha de vencimiento:</p>
+                <p className="font-semibold text-foreground">{formattedDate}</p>
+              </div>
+            </div>
             
             <p className="text-sm text-muted-foreground">
-              Para continuar usando el sistema, por favor contacta al administrador para renovar tu suscripción.
+              Para renovar tu servicio y continuar operando, contacta a nuestro equipo de soporte.
             </p>
 
-            <div className="pt-4 space-y-2">
-              <Button variant="outline" className="w-full" asChild>
-                <a href="tel:+1234567890">
-                  <Phone className="h-4 w-4 mr-2" />
-                  Llamar al Soporte
-                </a>
+            <div className="space-y-3">
+              <Button 
+                className="w-full gap-2" 
+                onClick={() => window.open(`https://wa.me/52${supportPhone}?text=${whatsappMessage}`, '_blank')}
+              >
+                <MessageCircle className="h-5 w-5" />
+                Contactar por WhatsApp
               </Button>
-              <Button variant="outline" className="w-full" asChild>
-                <a href="mailto:soporte@caiman.com">
-                  <Mail className="h-4 w-4 mr-2" />
-                  Enviar Correo
-                </a>
+              <Button 
+                variant="outline" 
+                className="w-full gap-2"
+                onClick={() => window.open(`tel:+52${supportPhone}`, '_blank')}
+              >
+                <Phone className="h-5 w-5" />
+                Llamar a Soporte
               </Button>
             </div>
 
-            <p className="text-xs text-muted-foreground pt-4">
-              Una vez realizado el pago, tu acceso será restaurado automáticamente.
+            <p className="text-xs text-muted-foreground pt-2">
+              Horario de atención: Lunes a Viernes 9:00 - 18:00
             </p>
           </CardContent>
         </Card>
