@@ -30,6 +30,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { 
   Store, 
   CreditCard, 
@@ -37,7 +43,8 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  History
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, differenceInDays, parseISO, addMonths } from "date-fns";
@@ -48,7 +55,22 @@ interface StoreWithSubscription {
   nombre: string;
   email: string | null;
   telefono: string | null;
-  fecha_vencimiento: string | null;
+  suscripcion: {
+    id: string;
+    fecha_vencimiento: string | null;
+    estado: string;
+    monto_pagado: number;
+  } | null;
+}
+
+interface HistorialPago {
+  id: string;
+  monto: number;
+  meses_pagados: number;
+  fecha_pago: string;
+  fecha_vencimiento_anterior: string | null;
+  fecha_vencimiento_nueva: string;
+  notas: string | null;
 }
 
 export default function AdminSubscriptions() {
@@ -68,74 +90,157 @@ export default function AdminSubscriptions() {
   const { data: stores = [], isLoading } = useQuery({
     queryKey: ['stores-subscriptions'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Get stores
+      const { data: storesData, error: storesError } = await supabase
         .from('puntos_venta')
-        .select('id, nombre, email, telefono, fecha_vencimiento')
+        .select('id, nombre, email, telefono')
         .order('nombre');
 
-      if (error) throw error;
-      return data as StoreWithSubscription[];
+      if (storesError) throw storesError;
+
+      // Get subscriptions
+      const { data: suscripciones } = await supabase
+        .from('suscripciones')
+        .select('*');
+
+      const suscripcionMap = new Map();
+      (suscripciones || []).forEach((s: any) => {
+        suscripcionMap.set(s.store_id, s);
+      });
+
+      // Also check puntos_venta.fecha_vencimiento as fallback
+      const result: StoreWithSubscription[] = storesData.map((store: any) => {
+        const sub = suscripcionMap.get(store.id);
+        return {
+          id: store.id,
+          nombre: store.nombre,
+          email: store.email,
+          telefono: store.telefono,
+          suscripcion: sub ? {
+            id: sub.id,
+            fecha_vencimiento: sub.fecha_vencimiento,
+            estado: sub.estado,
+            monto_pagado: sub.monto_pagado
+          } : null
+        };
+      });
+
+      return result;
     },
     enabled: !roleLoading && canAccess,
   });
 
-  // Fetch payment history
+  // Fetch payment history for a store
   const { data: paymentHistory = [] } = useQuery({
     queryKey: ['payment-history', selectedStore?.id],
     queryFn: async () => {
       if (!selectedStore?.id) return [];
+      
       const { data, error } = await supabase
-        .from('pagos_suscripcion')
+        .from('historial_pagos')
         .select('*')
         .eq('store_id', selectedStore.id)
         .order('fecha_pago', { ascending: false })
-        .limit(5);
+        .limit(10);
 
-      if (error) throw error;
-      return data;
+      if (error) {
+        // Fallback to pagos_suscripcion if historial_pagos doesn't exist
+        const { data: fallbackData } = await supabase
+          .from('pagos_suscripcion')
+          .select('*')
+          .eq('store_id', selectedStore.id)
+          .order('fecha_pago', { ascending: false })
+          .limit(10);
+        
+        return (fallbackData || []).map((p: any) => ({
+          id: p.id,
+          monto: p.monto,
+          meses_pagados: p.meses_pagados,
+          fecha_pago: p.fecha_pago,
+          fecha_vencimiento_anterior: null,
+          fecha_vencimiento_nueva: p.fecha_vencimiento,
+          notas: p.notas
+        }));
+      }
+      
+      return data as HistorialPago[];
     },
     enabled: !!selectedStore?.id,
   });
 
-  // Register payment mutation - using direct insert until RPC is created
+  // Register payment mutation
   const registerPaymentMutation = useMutation({
     mutationFn: async (data: { storeId: string; monto: number; meses: number; notas: string }) => {
-      // First get current expiration date
-      const { data: store } = await supabase
-        .from('puntos_venta')
-        .select('fecha_vencimiento')
-        .eq('id', data.storeId)
+      const hoy = new Date();
+      
+      // Get or check existing subscription
+      const { data: existingSub } = await (supabase as any)
+        .from('suscripciones')
+        .select('*')
+        .eq('store_id', data.storeId)
         .maybeSingle();
-      
-      // Calculate new expiration date
-      const storeData = store as { fecha_vencimiento: string | null } | null;
-      const baseDate = storeData?.fecha_vencimiento 
-        ? new Date(Math.max(new Date(storeData.fecha_vencimiento).getTime(), new Date().getTime()))
-        : new Date();
-      const newExpDate = addMonths(baseDate, data.meses);
-      const newExpDateStr = format(newExpDate, 'yyyy-MM-dd');
-      
-      // Insert payment record using raw query to avoid type issues
-      const { error: insertError } = await (supabase as any)
-        .from('pagos_suscripcion')
-        .insert({
-          store_id: data.storeId,
-          monto: data.monto,
-          meses_pagados: data.meses,
-          fecha_vencimiento: newExpDateStr,
-          notas: data.notas || null
-        });
 
-      if (insertError) throw insertError;
-      
-      // Update store expiration date
-      const { error: updateError } = await (supabase as any)
+      let fechaAnterior: string | null = null;
+      let nuevaFecha: Date;
+
+      if (existingSub) {
+        fechaAnterior = existingSub.fecha_vencimiento;
+        const baseDate = existingSub.fecha_vencimiento && new Date(existingSub.fecha_vencimiento) > hoy
+          ? new Date(existingSub.fecha_vencimiento)
+          : hoy;
+        nuevaFecha = addMonths(baseDate, data.meses);
+
+        // Update subscription
+        await (supabase as any)
+          .from('suscripciones')
+          .update({
+            monto_pagado: existingSub.monto_pagado + data.monto,
+            fecha_vencimiento: format(nuevaFecha, 'yyyy-MM-dd'),
+            estado: 'activo'
+          })
+          .eq('id', existingSub.id);
+      } else {
+        nuevaFecha = addMonths(hoy, data.meses);
+        
+        // Create new subscription
+        await (supabase as any)
+          .from('suscripciones')
+          .insert({
+            store_id: data.storeId,
+            monto_pagado: data.monto,
+            fecha_inicio: format(hoy, 'yyyy-MM-dd'),
+            fecha_vencimiento: format(nuevaFecha, 'yyyy-MM-dd'),
+            estado: 'activo'
+          });
+      }
+
+      // Also update puntos_venta for backwards compatibility
+      await (supabase as any)
         .from('puntos_venta')
-        .update({ fecha_vencimiento: newExpDateStr })
+        .update({ fecha_vencimiento: format(nuevaFecha, 'yyyy-MM-dd') })
         .eq('id', data.storeId);
 
-      if (updateError) throw updateError;
-      
+      // Record in historial_pagos
+      const { data: subForHistory } = await (supabase as any)
+        .from('suscripciones')
+        .select('id')
+        .eq('store_id', data.storeId)
+        .single();
+
+      if (subForHistory) {
+        await (supabase as any)
+          .from('historial_pagos')
+          .insert({
+            suscripcion_id: subForHistory.id,
+            store_id: data.storeId,
+            monto: data.monto,
+            meses_pagados: data.meses,
+            fecha_vencimiento_anterior: fechaAnterior,
+            fecha_vencimiento_nueva: format(nuevaFecha, 'yyyy-MM-dd'),
+            notas: data.notas || null
+          });
+      }
+
       return true;
     },
     onSuccess: () => {
@@ -171,7 +276,9 @@ export default function AdminSubscriptions() {
     });
   };
 
-  const getSubscriptionStatus = (fechaVencimiento: string | null) => {
+  const getSubscriptionStatus = (store: StoreWithSubscription) => {
+    const fechaVencimiento = store.suscripcion?.fecha_vencimiento;
+    
     if (!fechaVencimiento) {
       return { status: 'sin_suscripcion', days: 0, label: 'Sin suscripción', color: 'bg-muted text-muted-foreground' };
     }
@@ -196,8 +303,9 @@ export default function AdminSubscriptions() {
 
   const getExpectedNewDate = () => {
     if (!selectedStore) return '';
-    const baseDate = selectedStore.fecha_vencimiento 
-      ? new Date(Math.max(parseISO(selectedStore.fecha_vencimiento).getTime(), new Date().getTime()))
+    const fechaVenc = selectedStore.suscripcion?.fecha_vencimiento;
+    const baseDate = fechaVenc 
+      ? new Date(Math.max(parseISO(fechaVenc).getTime(), new Date().getTime()))
       : new Date();
     const newDate = addMonths(baseDate, parseInt(paymentData.meses));
     return format(newDate, "d 'de' MMMM, yyyy", { locale: es });
@@ -225,18 +333,13 @@ export default function AdminSubscriptions() {
 
   // Sort stores: expired first, then by expiration date
   const sortedStores = [...stores].sort((a, b) => {
-    const statusA = getSubscriptionStatus(a.fecha_vencimiento);
-    const statusB = getSubscriptionStatus(b.fecha_vencimiento);
+    const statusA = getSubscriptionStatus(a);
+    const statusB = getSubscriptionStatus(b);
     
-    // Vencidos primero
     if (statusA.status === 'vencido' && statusB.status !== 'vencido') return -1;
     if (statusB.status === 'vencido' && statusA.status !== 'vencido') return 1;
-    
-    // Por vencer segundo
     if (statusA.status === 'por_vencer' && statusB.status === 'activo') return -1;
     if (statusB.status === 'por_vencer' && statusA.status === 'activo') return 1;
-    
-    // Sin suscripción al final
     if (statusA.status === 'sin_suscripcion') return 1;
     if (statusB.status === 'sin_suscripcion') return -1;
     
@@ -248,8 +351,8 @@ export default function AdminSubscriptions() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Gestión de Suscripciones</h1>
-          <p className="text-muted-foreground">Administra los pagos y vencimientos de las tiendas</p>
+          <h1 className="text-3xl font-bold text-foreground">Gestión de Cobros</h1>
+          <p className="text-muted-foreground">Administra los pagos y suscripciones de las tiendas</p>
         </div>
 
         {/* Summary Cards */}
@@ -276,7 +379,7 @@ export default function AdminSubscriptions() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
-                    {stores.filter(s => getSubscriptionStatus(s.fecha_vencimiento).status === 'activo').length}
+                    {stores.filter(s => getSubscriptionStatus(s).status === 'activo').length}
                   </p>
                   <p className="text-sm text-muted-foreground">Al Día</p>
                 </div>
@@ -292,7 +395,7 @@ export default function AdminSubscriptions() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
-                    {stores.filter(s => getSubscriptionStatus(s.fecha_vencimiento).status === 'por_vencer').length}
+                    {stores.filter(s => getSubscriptionStatus(s).status === 'por_vencer').length}
                   </p>
                   <p className="text-sm text-muted-foreground">Por Vencer</p>
                 </div>
@@ -308,7 +411,7 @@ export default function AdminSubscriptions() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
-                    {stores.filter(s => getSubscriptionStatus(s.fecha_vencimiento).status === 'vencido').length}
+                    {stores.filter(s => getSubscriptionStatus(s).status === 'vencido').length}
                   </p>
                   <p className="text-sm text-muted-foreground">Vencidos</p>
                 </div>
@@ -317,7 +420,7 @@ export default function AdminSubscriptions() {
           </Card>
         </div>
 
-        {/* Stores Table */}
+        {/* Stores with Accordion for History */}
         <Card className="glass-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -337,22 +440,17 @@ export default function AdminSubscriptions() {
                 No hay tiendas registradas
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tienda</TableHead>
-                    <TableHead>Contacto</TableHead>
-                    <TableHead>Fecha Vencimiento</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedStores.map((store) => {
-                    const status = getSubscriptionStatus(store.fecha_vencimiento);
-                    return (
-                      <TableRow key={store.id} className={status.status === 'vencido' ? 'bg-destructive/5' : ''}>
-                        <TableCell>
+              <Accordion type="single" collapsible className="space-y-2">
+                {sortedStores.map((store) => {
+                  const status = getSubscriptionStatus(store);
+                  return (
+                    <AccordionItem 
+                      key={store.id} 
+                      value={store.id}
+                      className={`border rounded-lg px-4 ${status.status === 'vencido' ? 'bg-destructive/5 border-destructive/20' : 'bg-card'}`}
+                    >
+                      <AccordionTrigger className="hover:no-underline py-4">
+                        <div className="flex items-center justify-between w-full pr-4">
                           <div className="flex items-center gap-3">
                             <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
                               status.status === 'vencido' ? 'bg-destructive/10' : 
@@ -363,45 +461,41 @@ export default function AdminSubscriptions() {
                                 status.status === 'activo' ? 'text-success' : 'text-muted-foreground'
                               }`} />
                             </div>
-                            <span className="font-medium">{store.nombre}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            {store.email && <div>{store.email}</div>}
-                            {store.telefono && <div className="text-muted-foreground">{store.telefono}</div>}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {store.fecha_vencimiento ? (
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4 text-muted-foreground" />
-                              {format(parseISO(store.fecha_vencimiento), "d MMM yyyy", { locale: es })}
+                            <div className="text-left">
+                              <p className="font-medium">{store.nombre}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {store.suscripcion?.fecha_vencimiento 
+                                  ? `Vence: ${format(parseISO(store.suscripcion.fecha_vencimiento), "d MMM yyyy", { locale: es })}`
+                                  : 'Sin fecha de vencimiento'
+                                }
+                              </p>
                             </div>
-                          ) : (
-                            <span className="text-muted-foreground">No definida</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={status.color}>
-                            {status.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            onClick={() => openPaymentDialog(store)}
-                            className="gradient-primary"
-                          >
-                            <CreditCard className="h-4 w-4 mr-1" />
-                            Registrar Pago
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Badge className={status.color}>
+                              {status.label}
+                            </Badge>
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openPaymentDialog(store);
+                              }}
+                              className="gradient-primary"
+                            >
+                              <CreditCard className="h-4 w-4 mr-1" />
+                              Registrar Pago
+                            </Button>
+                          </div>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <StorePaymentHistory storeId={store.id} />
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
             )}
           </CardContent>
         </Card>
@@ -418,8 +512,8 @@ export default function AdminSubscriptions() {
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-sm text-muted-foreground">Estado actual:</p>
                   <p className="font-medium">
-                    {selectedStore.fecha_vencimiento 
-                      ? `Vence: ${format(parseISO(selectedStore.fecha_vencimiento), "d 'de' MMMM, yyyy", { locale: es })}`
+                    {selectedStore.suscripcion?.fecha_vencimiento 
+                      ? `Vence: ${format(parseISO(selectedStore.suscripcion.fecha_vencimiento), "d 'de' MMMM, yyyy", { locale: es })}`
                       : 'Sin fecha de vencimiento'
                     }
                   </p>
@@ -447,6 +541,7 @@ export default function AdminSubscriptions() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="1">1 mes</SelectItem>
+                    <SelectItem value="2">2 meses</SelectItem>
                     <SelectItem value="3">3 meses</SelectItem>
                     <SelectItem value="6">6 meses</SelectItem>
                     <SelectItem value="12">12 meses</SelectItem>
@@ -469,21 +564,6 @@ export default function AdminSubscriptions() {
                 <p className="font-medium text-success">{getExpectedNewDate()}</p>
               </div>
 
-              {/* Recent payments */}
-              {paymentHistory.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground">Últimos pagos:</Label>
-                  <div className="space-y-1 text-sm">
-                    {paymentHistory.map((payment: any) => (
-                      <div key={payment.id} className="flex justify-between text-muted-foreground">
-                        <span>{format(parseISO(payment.fecha_pago), "d MMM yyyy", { locale: es })}</span>
-                        <span>${payment.monto} ({payment.meses_pagados} mes{payment.meses_pagados > 1 ? 'es' : ''})</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <Button 
                 className="w-full gradient-primary" 
                 onClick={handleRegisterPayment}
@@ -496,5 +576,92 @@ export default function AdminSubscriptions() {
         </Dialog>
       </div>
     </AppLayout>
+  );
+}
+
+// Component to show payment history for a store
+function StorePaymentHistory({ storeId }: { storeId: string }) {
+  const { data: history = [], isLoading } = useQuery({
+    queryKey: ['store-payment-history', storeId],
+    queryFn: async () => {
+      // Try historial_pagos first
+      const { data, error } = await supabase
+        .from('historial_pagos')
+        .select('*')
+        .eq('store_id', storeId)
+        .order('fecha_pago', { ascending: false })
+        .limit(5);
+
+      if (error) {
+        // Fallback to pagos_suscripcion
+        const { data: fallbackData } = await supabase
+          .from('pagos_suscripcion')
+          .select('*')
+          .eq('store_id', storeId)
+          .order('fecha_pago', { ascending: false })
+          .limit(5);
+        
+        return (fallbackData || []).map((p: any) => ({
+          id: p.id,
+          monto: p.monto,
+          meses_pagados: p.meses_pagados,
+          fecha_pago: p.fecha_pago,
+          fecha_vencimiento_nueva: p.fecha_vencimiento,
+          notas: p.notas
+        }));
+      }
+      
+      return data || [];
+    },
+  });
+
+  if (isLoading) {
+    return <Skeleton className="h-20 w-full" />;
+  }
+
+  if (history.length === 0) {
+    return (
+      <div className="py-4 text-center text-muted-foreground">
+        <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
+        <p>No hay historial de pagos</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="py-4">
+      <h4 className="font-medium mb-3 flex items-center gap-2">
+        <History className="h-4 w-4" />
+        Historial de Pagos
+      </h4>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Fecha</TableHead>
+            <TableHead>Monto</TableHead>
+            <TableHead>Meses</TableHead>
+            <TableHead>Nueva Fecha</TableHead>
+            <TableHead>Notas</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {history.map((pago: any) => (
+            <TableRow key={pago.id}>
+              <TableCell>
+                {format(parseISO(pago.fecha_pago), "d MMM yyyy", { locale: es })}
+              </TableCell>
+              <TableCell className="font-medium">${pago.monto}</TableCell>
+              <TableCell>{pago.meses_pagados} mes{pago.meses_pagados > 1 ? 'es' : ''}</TableCell>
+              <TableCell>
+                {format(parseISO(pago.fecha_vencimiento_nueva), "d MMM yyyy", { locale: es })}
+              </TableCell>
+              <TableCell className="text-muted-foreground text-sm">
+                {pago.notas || '-'}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
