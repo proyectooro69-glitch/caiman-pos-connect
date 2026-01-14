@@ -100,6 +100,79 @@ export interface Database {
           created_at?: string
         }
       }
+      suscripciones: {
+        Row: {
+          id: string
+          store_id: string
+          monto_pagado: number
+          fecha_inicio: string
+          fecha_vencimiento: string | null
+          estado: 'activo' | 'vencido'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          store_id: string
+          monto_pagado?: number
+          fecha_inicio?: string
+          fecha_vencimiento?: string | null
+          estado?: 'activo' | 'vencido'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          store_id?: string
+          monto_pagado?: number
+          fecha_inicio?: string
+          fecha_vencimiento?: string | null
+          estado?: 'activo' | 'vencido'
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      historial_pagos: {
+        Row: {
+          id: string
+          suscripcion_id: string
+          store_id: string
+          monto: number
+          meses_pagados: number
+          fecha_pago: string
+          fecha_vencimiento_anterior: string | null
+          fecha_vencimiento_nueva: string
+          notas: string | null
+          registrado_por: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          suscripcion_id: string
+          store_id: string
+          monto: number
+          meses_pagados?: number
+          fecha_pago?: string
+          fecha_vencimiento_anterior?: string | null
+          fecha_vencimiento_nueva: string
+          notas?: string | null
+          registrado_por?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          suscripcion_id?: string
+          store_id?: string
+          monto?: number
+          meses_pagados?: number
+          fecha_pago?: string
+          fecha_vencimiento_anterior?: string | null
+          fecha_vencimiento_nueva?: string
+          notas?: string | null
+          registrado_por?: string | null
+          created_at?: string
+        }
+      }
       profiles: {
         Row: {
           id: string
