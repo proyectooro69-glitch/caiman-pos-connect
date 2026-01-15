@@ -46,7 +46,9 @@ import {
   Clock,
   History,
   Download,
-  MessageCircle
+  MessageCircle,
+  Mail,
+  Send
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, differenceInDays, parseISO, addMonths } from "date-fns";
@@ -82,6 +84,10 @@ export default function AdminSubscriptions() {
   const queryClient = useQueryClient();
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false);
+  const [isTestEmailDialogOpen, setIsTestEmailDialogOpen] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+  const [isSendingConfirmationEmail, setIsSendingConfirmationEmail] = useState(false);
   const [selectedStore, setSelectedStore] = useState<StoreWithSubscription | null>(null);
   const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null);
   const [paymentData, setPaymentData] = useState({
@@ -283,6 +289,64 @@ export default function AdminSubscriptions() {
     window.open(`https://wa.me/52${phone}?text=${message}`, '_blank');
   };
 
+  const handleSendTestEmail = async () => {
+    if (!testEmail) {
+      toast.error('Ingresa un correo electrónico');
+      return;
+    }
+
+    setIsSendingTestEmail(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-subscription-email', {
+        body: {
+          type: 'test',
+          test_email: testEmail
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success('Email de prueba enviado correctamente');
+      setIsTestEmailDialogOpen(false);
+      setTestEmail('');
+    } catch (error: any) {
+      console.error('Error sending test email:', error);
+      toast.error(`Error: ${error.message || 'No se pudo enviar el email'}`);
+    } finally {
+      setIsSendingTestEmail(false);
+    }
+  };
+
+  const handleSendConfirmationEmail = async () => {
+    if (!paymentResult || !paymentResult.storeEmail) {
+      toast.error('La tienda no tiene email registrado');
+      return;
+    }
+
+    setIsSendingConfirmationEmail(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-subscription-email', {
+        body: {
+          type: 'payment_confirmation',
+          store_id: paymentResult.paymentId,
+          store_name: paymentResult.storeName,
+          store_email: paymentResult.storeEmail,
+          new_expiration_date: paymentResult.newExpirationDate,
+          payment_amount: paymentResult.monto
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success('Email de confirmación enviado correctamente');
+    } catch (error: any) {
+      console.error('Error sending confirmation email:', error);
+      toast.error(`Error: ${error.message || 'No se pudo enviar el email'}`);
+    } finally {
+      setIsSendingConfirmationEmail(false);
+    }
+  };
+
   const getSubscriptionStatus = (store: StoreWithSubscription) => {
     const fechaVencimiento = store.suscripcion?.fecha_vencimiento;
     
@@ -364,9 +428,21 @@ export default function AdminSubscriptions() {
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Control de Suscripciones</h1>
-          <p className="text-muted-foreground">Gestiona los cobros y pagos de suscripciones</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Control de Suscripciones</h1>
+            <p className="text-muted-foreground">Gestiona los cobros y pagos de suscripciones</p>
+          </div>
+          {isAdmin && (
+            <Button 
+              variant="outline" 
+              onClick={() => setIsTestEmailDialogOpen(true)}
+              className="gap-2"
+            >
+              <Mail className="h-4 w-4" />
+              Enviar email de prueba
+            </Button>
+          )}
         </div>
 
         {/* Summary Cards */}
@@ -635,6 +711,18 @@ export default function AdminSubscriptions() {
                       Enviar por WhatsApp
                     </Button>
                   )}
+
+                  {paymentResult.storeEmail && (
+                    <Button 
+                      variant="outline" 
+                      onClick={handleSendConfirmationEmail} 
+                      className="w-full gap-2"
+                      disabled={isSendingConfirmationEmail}
+                    >
+                      <Send className="h-4 w-4" />
+                      {isSendingConfirmationEmail ? 'Enviando...' : 'Enviar confirmación por Email'}
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
@@ -642,6 +730,49 @@ export default function AdminSubscriptions() {
             <DialogFooter>
               <Button variant="ghost" onClick={closeSuccessDialog} className="w-full">
                 Cerrar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Test Email Dialog */}
+        <Dialog open={isTestEmailDialogOpen} onOpenChange={setIsTestEmailDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5 text-primary" />
+                Enviar Email de Prueba
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <p className="text-sm text-muted-foreground">
+                Ingresa tu correo electrónico para verificar que la configuración de emails está funcionando correctamente.
+              </p>
+              
+              <div className="space-y-2">
+                <Label htmlFor="test-email">Correo electrónico</Label>
+                <Input
+                  id="test-email"
+                  type="email"
+                  placeholder="tu-correo@ejemplo.com"
+                  value={testEmail}
+                  onChange={(e) => setTestEmail(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <DialogFooter className="gap-2">
+              <Button variant="ghost" onClick={() => setIsTestEmailDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleSendTestEmail} 
+                disabled={isSendingTestEmail || !testEmail}
+                className="gap-2"
+              >
+                <Send className="h-4 w-4" />
+                {isSendingTestEmail ? 'Enviando...' : 'Enviar prueba'}
               </Button>
             </DialogFooter>
           </DialogContent>
