@@ -13,6 +13,7 @@ import {
   Package,
   Store,
   Settings,
+  BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +22,8 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { IncomeDashboard } from "@/components/admin/IncomeDashboard";
 import type { Inventario, ProductCategory } from "@/types/database";
 
 // Categories from database
@@ -185,7 +188,27 @@ const Dashboard = () => {
           </Card>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Admin Dashboard with Tabs */}
+        {isAdmin ? (
+          <Tabs defaultValue="ingresos" className="space-y-6">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="ingresos" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Dashboard de Ingresos
+              </TabsTrigger>
+              <TabsTrigger value="pos" className="flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4" />
+                Punto de Venta
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="ingresos">
+              <IncomeDashboard />
+            </TabsContent>
+
+            <TabsContent value="pos">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
           {/* Products Section */}
           <div className="lg:col-span-2 space-y-4">
             {/* Search & Categories */}
@@ -366,6 +389,192 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+            </TabsContent>
+          </Tabs>
+        ) : (
+          /* Non-admin users see the POS directly */
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Products Section */}
+            <div className="lg:col-span-2 space-y-4">
+              {/* Search & Categories */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Buscar productos..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              {/* Categories */}
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {categories.map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => setSelectedCategory(category)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                      selectedCategory === category
+                        ? "bg-primary text-primary-foreground shadow-md"
+                        : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+
+              {/* Products Grid */}
+              {loading ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="glass-card rounded-xl p-4 animate-pulse">
+                      <div className="w-full aspect-square rounded-lg bg-secondary mb-3" />
+                      <div className="h-4 bg-secondary rounded w-3/4 mb-2" />
+                      <div className="h-3 bg-secondary rounded w-1/2" />
+                    </div>
+                  ))}
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <Card className="glass-card">
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <Package className="h-16 w-16 text-muted-foreground/30 mb-4" />
+                    <p className="text-muted-foreground">No hay productos disponibles</p>
+                    <p className="text-muted-foreground/60 text-sm">Agrega productos desde el inventario</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {filteredProducts.map((product, index) => (
+                    <button
+                      key={product.id}
+                      onClick={() => addToCart(product)}
+                      className="glass-card rounded-xl p-4 text-left hover:border-primary/50 hover:shadow-glow transition-all duration-200 animate-fade-in"
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    >
+                      <div className="w-full aspect-square rounded-lg bg-secondary mb-3 flex items-center justify-center overflow-hidden">
+                        {product.imagen_url ? (
+                          <img src={product.imagen_url} alt={product.nombre} className="w-full h-full object-cover" />
+                        ) : (
+                          <Package className="h-12 w-12 text-muted-foreground/50" />
+                        )}
+                      </div>
+                      <h3 className="font-medium text-foreground text-sm mb-1 line-clamp-2">
+                        {product.nombre}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mb-2">{categoryLabels[product.categoria]}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg font-bold text-primary">
+                          ${product.precio.toFixed(2)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          Stock: {product.stock}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Cart Section */}
+            <Card className="glass-card h-fit sticky top-20">
+              <CardHeader className="border-b border-border">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart className="h-5 w-5 text-primary" />
+                    <span>Carrito</span>
+                    <Badge variant="secondary">{cart.reduce((sum, item) => sum + item.quantity, 0)}</Badge>
+                  </div>
+                  {cart.length > 0 && (
+                    <button
+                      onClick={clearCart}
+                      className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      Vaciar
+                    </button>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                {cart.length === 0 ? (
+                  <div className="text-center py-8">
+                    <ShoppingCart className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+                    <p className="text-muted-foreground text-sm">El carrito está vacío</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-3 max-h-64 overflow-auto">
+                      {cart.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-foreground text-sm truncate">{item.name}</p>
+                            <p className="text-primary font-semibold">${(item.price * item.quantity).toFixed(2)}</p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => updateQuantity(item.id, -1)}
+                              className="p-1.5 rounded-md bg-secondary hover:bg-border transition-colors"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+                            <button
+                              onClick={() => updateQuantity(item.id, 1)}
+                              className="p-1.5 rounded-md bg-secondary hover:bg-border transition-colors"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={() => removeFromCart(item.id)}
+                              className="p-1.5 rounded-md text-destructive hover:bg-destructive/10 transition-colors ml-1"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Totals */}
+                    <div className="border-t border-border pt-4 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Subtotal</span>
+                        <span>${subtotal.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">IVA (16%)</span>
+                        <span>${tax.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-lg font-bold pt-2 border-t border-border">
+                        <span>Total</span>
+                        <span className="text-primary">${total.toFixed(2)}</span>
+                      </div>
+                    </div>
+
+                    {/* Payment buttons */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button variant="outline" className="w-full">
+                        <Banknote className="h-4 w-4 mr-2" />
+                        Efectivo
+                      </Button>
+                      <Button className="gradient-primary w-full">
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Tarjeta
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </AppLayout>
   );
