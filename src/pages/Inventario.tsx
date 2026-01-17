@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -42,8 +43,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { RecetaManager } from "@/components/inventario/RecetaManager";
 import { toast } from "sonner";
-import { Plus, Search, Package, Edit, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, Search, Package, Edit, Trash2, AlertTriangle, ChefHat, Layers } from "lucide-react";
 
 type ProductCategory = 'bebidas' | 'alimentos' | 'productos_limpieza' | 'vestuario' | 'calzados' | 'ferreteria' | 'otros';
 type ProductType = 'insumo' | 'producto_final';
@@ -107,6 +109,7 @@ export default function InventarioPage() {
   const { role, storeId, loading: roleLoading, isAdmin, isSupervisor } = useUserRole();
   const queryClient = useQueryClient();
   
+  const [activeTab, setActiveTab] = useState("productos");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
@@ -258,6 +261,10 @@ export default function InventarioPage() {
     return matchesSearch && matchesCategory && matchesType;
   });
 
+  // Get productos finales for recetas tab
+  const productosFinal = productos?.filter(p => p.tipo === 'producto_final') || [];
+  const insumos = productos?.filter(p => p.tipo === 'insumo') || [];
+
   // Stats
   const totalProducts = productos?.length || 0;
   const lowStockProducts = productos?.filter(p => p.stock <= p.stock_minimo).length || 0;
@@ -300,7 +307,7 @@ export default function InventarioPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Inventario</h1>
-            <p className="text-muted-foreground">Gestiona tus productos e insumos</p>
+            <p className="text-muted-foreground">Gestiona tus productos, insumos y recetas</p>
           </div>
           
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -473,155 +480,212 @@ export default function InventarioPage() {
           </Card>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar productos..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          
-          <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las categorías</SelectItem>
-              {CATEGORIES.map((cat) => (
-                <SelectItem key={cat.value} value={cat.value}>
-                  {cat.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="productos" className="gap-2">
+              <Layers className="h-4 w-4" />
+              Productos
+            </TabsTrigger>
+            <TabsTrigger value="recetas" className="gap-2">
+              <ChefHat className="h-4 w-4" />
+              Recetas
+            </TabsTrigger>
+          </TabsList>
 
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-full sm:w-40">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los tipos</SelectItem>
-              {PRODUCT_TYPES.map((type) => (
-                <SelectItem key={type.value} value={type.value}>
-                  {type.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Products Table */}
-        <Card>
-          <CardContent className="p-0">
-            {productosLoading ? (
-              <div className="p-6 space-y-4">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
+          {/* Productos Tab */}
+          <TabsContent value="productos" className="space-y-4">
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar productos..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
-            ) : filteredProducts && filteredProducts.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Producto</TableHead>
-                    <TableHead>Categoría</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead className="text-right">Precio</TableHead>
-                    <TableHead className="text-center">Stock</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProducts.map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{product.nombre}</p>
-                          {product.descripcion && (
-                            <p className="text-sm text-muted-foreground truncate max-w-xs">
-                              {product.descripcion}
-                            </p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {CATEGORIES.find(c => c.value === product.categoria)?.label || product.categoria}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={product.tipo === "insumo" ? "secondary" : "default"}>
-                          {product.tipo === "insumo" ? "Insumo" : "Final"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        ${product.precio.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className={product.stock <= product.stock_minimo ? "text-destructive font-medium" : ""}>
-                          {product.stock}
-                        </span>
-                        {product.stock <= product.stock_minimo && (
-                          <AlertTriangle className="inline-block ml-1 h-4 w-4 text-destructive" />
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(product)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Esta acción no se puede deshacer. Se eliminará permanentemente
-                                  "{product.nombre}" del inventario.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => deleteMutation.mutate(product.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
-                                  Eliminar
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+              
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder="Categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las categorías</SelectItem>
+                  {CATEGORIES.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </SelectItem>
                   ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Package className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">No hay productos</h3>
-                <p className="text-muted-foreground mt-1">
-                  {searchTerm || filterCategory !== "all" || filterType !== "all"
-                    ? "No se encontraron productos con los filtros aplicados"
-                    : "Comienza agregando tu primer producto"}
+                </SelectContent>
+              </Select>
+
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-full sm:w-40">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los tipos</SelectItem>
+                  {PRODUCT_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Products Table */}
+            <Card>
+              <CardContent className="p-0">
+                {productosLoading ? (
+                  <div className="p-6 space-y-4">
+                    {[...Array(5)].map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : filteredProducts && filteredProducts.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Producto</TableHead>
+                        <TableHead>Categoría</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead className="text-right">Precio</TableHead>
+                        <TableHead className="text-center">Stock</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredProducts.map((product) => (
+                        <TableRow key={product.id}>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{product.nombre}</p>
+                              {product.descripcion && (
+                                <p className="text-sm text-muted-foreground truncate max-w-xs">
+                                  {product.descripcion}
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {CATEGORIES.find(c => c.value === product.categoria)?.label || product.categoria}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={product.tipo === "insumo" ? "secondary" : "default"}>
+                              {product.tipo === "insumo" ? "Insumo" : "Final"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            ${product.precio.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className={product.stock <= product.stock_minimo ? "text-destructive font-medium" : ""}>
+                              {product.stock}
+                            </span>
+                            {product.stock <= product.stock_minimo && (
+                              <AlertTriangle className="inline-block ml-1 h-4 w-4 text-destructive" />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEdit(product)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Esta acción no se puede deshacer. Se eliminará permanentemente
+                                      "{product.nombre}" del inventario.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => deleteMutation.mutate(product.id)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Eliminar
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Package className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium">No hay productos</h3>
+                    <p className="text-muted-foreground mt-1">
+                      {searchTerm || filterCategory !== "all" || filterType !== "all"
+                        ? "No se encontraron productos con los filtros aplicados"
+                        : "Comienza agregando tu primer producto"}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Recetas Tab */}
+          <TabsContent value="recetas" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ChefHat className="h-5 w-5 text-primary" />
+                  Gestión de Recetas
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Define qué insumos componen cada producto final. Al vender un producto, se descontará automáticamente el stock de los insumos.
                 </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </CardHeader>
+              <CardContent>
+                {productosFinal.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Package className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium">No hay productos finales</h3>
+                    <p className="text-muted-foreground mt-1">
+                      Crea productos de tipo "Producto Final" para poder asignarles recetas.
+                    </p>
+                  </div>
+                ) : insumos.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Package className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium">No hay insumos</h3>
+                    <p className="text-muted-foreground mt-1">
+                      Crea productos de tipo "Insumo" para poder usarlos en las recetas.
+                    </p>
+                  </div>
+                ) : (
+                  <RecetaManager 
+                    productosFinal={productosFinal}
+                    insumos={insumos}
+                    storeId={storeId}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );

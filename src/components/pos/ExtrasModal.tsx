@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = 'https://mkofteflphrmdkmzcpxw.supabase.co';
@@ -23,41 +23,45 @@ interface Agrego {
   insumo_id: string;
 }
 
-interface SelectedAgrego extends Agrego {
-  selected: boolean;
+export interface Extra {
+  id: string;
+  nombre: string;
+  precio: number;
 }
 
 interface ExtrasModalProps {
   open: boolean;
-  onClose: () => void;
-  producto: {
+  onOpenChange: (open: boolean) => void;
+  product: {
     id: string;
     nombre: string;
     precio: number;
   } | null;
-  onConfirm: (producto: {
-    id: string;
-    nombre: string;
-    precio: number;
-    agregos: SelectedAgrego[];
-    precioFinal: number;
-  }) => void;
+  storeId: string | null;
+  onConfirm: (product: { id: string; nombre: string; precio: number }, extras: Extra[]) => void;
 }
 
-export function ExtrasModal({ open, onClose, producto, onConfirm }: ExtrasModalProps) {
+export function ExtrasModal({ open, onOpenChange, product, storeId, onConfirm }: ExtrasModalProps) {
   const [selectedAgregos, setSelectedAgregos] = useState<Record<string, boolean>>({});
+
+  // Reset selections when modal opens
+  useEffect(() => {
+    if (open) {
+      setSelectedAgregos({});
+    }
+  }, [open]);
 
   // Fetch agregos for this product
   const { data: agregos, isLoading } = useQuery({
-    queryKey: ["agregos-producto", producto?.id],
+    queryKey: ["agregos-producto", product?.id],
     queryFn: async () => {
-      if (!producto) return [];
+      if (!product) return [];
       
       // First get producto_agregos links
       const { data: links } = await supabase
         .from("producto_agregos")
         .select("agrego_id")
-        .eq("producto_id", producto.id);
+        .eq("producto_id", product.id);
 
       if (!links || links.length === 0) return [];
 
@@ -70,7 +74,7 @@ export function ExtrasModal({ open, onClose, producto, onConfirm }: ExtrasModalP
 
       return (agregosData || []) as Agrego[];
     },
-    enabled: !!producto && open,
+    enabled: !!product && open,
   });
 
   const handleToggleAgrego = (agregoId: string) => {
@@ -81,50 +85,44 @@ export function ExtrasModal({ open, onClose, producto, onConfirm }: ExtrasModalP
   };
 
   const handleConfirm = () => {
-    if (!producto) return;
+    if (!product) return;
 
-    const selected = (agregos || [])
+    const selected: Extra[] = (agregos || [])
       .filter(a => selectedAgregos[a.id])
-      .map(a => ({ ...a, selected: true }));
+      .map(a => ({ 
+        id: a.id, 
+        nombre: a.nombre, 
+        precio: a.precio_adicional 
+      }));
 
-    const extraPrice = selected.reduce((sum, a) => sum + a.precio_adicional, 0);
-    const precioFinal = producto.precio + extraPrice;
-
-    onConfirm({
-      id: producto.id,
-      nombre: producto.nombre,
-      precio: producto.precio,
-      agregos: selected,
-      precioFinal,
-    });
-
+    onConfirm(product, selected);
     setSelectedAgregos({});
   };
 
   const handleClose = () => {
     setSelectedAgregos({});
-    onClose();
+    onOpenChange(false);
   };
 
   const extraPrice = (agregos || [])
     .filter(a => selectedAgregos[a.id])
     .reduce((sum, a) => sum + a.precio_adicional, 0);
 
-  const precioFinal = (producto?.precio || 0) + extraPrice;
+  const precioFinal = (product?.precio || 0) + extraPrice;
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            {producto?.nombre}
+            {product?.nombre}
           </DialogTitle>
         </DialogHeader>
 
         <div className="py-4">
           <p className="text-sm text-muted-foreground mb-4">
-            Precio base: <span className="font-bold text-foreground">${producto?.precio.toFixed(2)}</span>
+            Precio base: <span className="font-bold text-foreground">${product?.precio.toFixed(2)}</span>
           </p>
 
           {isLoading ? (
@@ -133,6 +131,7 @@ export function ExtrasModal({ open, onClose, producto, onConfirm }: ExtrasModalP
             <div className="text-center py-8 text-muted-foreground">
               <Plus className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p>Este producto no tiene extras disponibles</p>
+              <p className="text-xs mt-1">Se añadirá directamente al carrito</p>
             </div>
           ) : (
             <div className="space-y-3">

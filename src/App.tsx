@@ -11,6 +11,8 @@ import Dashboard from "./pages/Dashboard";
 import Ventas from "./pages/Ventas";
 import Reportes from "./pages/Reportes";
 import Inventario from "./pages/Inventario";
+import Mesas from "./pages/Mesas";
+import Clientes from "./pages/Clientes";
 import AdminUsers from "./pages/AdminUsers";
 import AdminStores from "./pages/AdminStores";
 import AdminInvitations from "./pages/AdminInvitations";
@@ -62,6 +64,26 @@ const App = () => (
                 <ProtectedRoute>
                   <SubscriptionBlocker>
                     <Inventario />
+                  </SubscriptionBlocker>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/mesas"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionBlocker>
+                    <Mesas />
+                  </SubscriptionBlocker>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/clientes"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionBlocker>
+                    <Clientes />
                   </SubscriptionBlocker>
                 </ProtectedRoute>
               }

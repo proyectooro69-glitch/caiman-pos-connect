@@ -1,14 +1,17 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { createClient } from "@supabase/supabase-js";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
+import { ExtrasModal, Extra } from "@/components/pos/ExtrasModal";
+import { AssignmentSelector } from "@/components/pos/AssignmentSelector";
+import {
   ShoppingCart, 
   Plus, 
   Minus, 
@@ -16,29 +19,49 @@ import {
   CreditCard, 
   Banknote,
   Search,
-  Package
+  Package,
+  Settings
 } from "lucide-react";
 import { toast } from "sonner";
 
+const supabaseUrl = 'https://mkofteflphrmdkmzcpxw.supabase.co';
+const supabaseAnonKey = 'sb_publishable_BcOFivZl7dFD_WSUUjfc4g_rZRdBDHN';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
 interface CartItem {
   id: string;
+  cartItemId: string; // Unique ID for each cart entry
   nombre: string;
   precio: number;
   cantidad: number;
+  extras: Extra[];
+  extrasTotal: number;
 }
 
 export default function Ventas() {
   const { role, storeId, loading: roleLoading } = useUserRole();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
+  
+  // Assignment state
+  const [assignmentType, setAssignmentType] = useState<'none' | 'mesa' | 'cliente'>('none');
+  const [assignmentId, setAssignmentId] = useState<string | null>(null);
+  
+  // Extras modal state
+  const [extrasModalOpen, setExtrasModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<{ id: string; nombre: string; precio: number } | null>(null);
 
   // Fetch products for the user's store
   const { data: productos = [], isLoading } = useQuery({
     queryKey: ['productos-venta', storeId],
     queryFn: async () => {
+      if (!storeId) return [];
       const { data, error } = await supabase
         .from('inventario')
         .select('*')
+        .eq('punto_venta_id', storeId)
         .eq('tipo', 'producto_final')
         .gt('stock', 0)
         .order('nombre');
@@ -46,35 +69,39 @@ export default function Ventas() {
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !roleLoading,
+    enabled: !roleLoading && !!storeId,
   });
 
   const filteredProducts = productos?.filter(p => 
     p.nombre.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
-  const addToCart = (product: { id: string; nombre: string; precio: number }) => {
-    setCart(prev => {
-      const existing = prev.find(item => item.id === product.id);
-      if (existing) {
-        return prev.map(item => 
-          item.id === product.id 
-            ? { ...item, cantidad: item.cantidad + 1 }
-            : item
-        );
-      }
-      return [...prev, { 
-        id: product.id, 
-        nombre: product.nombre, 
-        precio: product.precio, 
-        cantidad: 1 
-      }];
-    });
+  const handleProductClick = (product: { id: string; nombre: string; precio: number }) => {
+    setSelectedProduct(product);
+    setExtrasModalOpen(true);
   };
 
-  const updateQuantity = (id: string, delta: number) => {
+  const handleAddToCart = (product: { id: string; nombre: string; precio: number }, extras: Extra[]) => {
+    const extrasTotal = extras.reduce((sum, e) => sum + e.precio, 0);
+    const cartItemId = `${product.id}-${Date.now()}`;
+    
+    setCart(prev => [...prev, {
+      id: product.id,
+      cartItemId,
+      nombre: product.nombre,
+      precio: product.precio,
+      cantidad: 1,
+      extras,
+      extrasTotal,
+    }]);
+    
+    setExtrasModalOpen(false);
+    setSelectedProduct(null);
+  };
+
+  const updateQuantity = (cartItemId: string, delta: number) => {
     setCart(prev => prev.map(item => {
-      if (item.id === id) {
+      if (item.cartItemId === cartItemId) {
         const newQty = item.cantidad + delta;
         return newQty > 0 ? { ...item, cantidad: newQty } : item;
       }
@@ -82,22 +109,123 @@ export default function Ventas() {
     }).filter(item => item.cantidad > 0));
   };
 
-  const removeFromCart = (id: string) => {
-    setCart(prev => prev.filter(item => item.id !== id));
+  const removeFromCart = (cartItemId: string) => {
+    setCart(prev => prev.filter(item => item.cartItemId !== cartItemId));
   };
 
-  const subtotal = cart.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+  const subtotal = cart.reduce((sum, item) => sum + ((item.precio + item.extrasTotal) * item.cantidad), 0);
   const impuesto = subtotal * 0.16;
   const total = subtotal + impuesto;
 
-  const processSale = async (metodoPago: string) => {
+  // Process sale mutation
+  const processSaleMutation = useMutation({
+    mutationFn: async (metodoPago: string) => {
+      if (!storeId || !user) throw new Error("Missing store or user");
+      if (cart.length === 0) throw new Error("El carrito está vacío");
+
+      // Create venta
+      const { data: venta, error: ventaError } = await supabase
+        .from("ventas")
+        .insert({
+          punto_venta_id: storeId,
+          vendedor_id: user.id,
+          mesa_id: assignmentType === 'mesa' ? assignmentId : null,
+          cliente_id: assignmentType === 'cliente' ? assignmentId : null,
+          subtotal,
+          impuesto,
+          total,
+          metodo_pago: metodoPago,
+          estado: "completada",
+        })
+        .select()
+        .single();
+      if (ventaError) throw ventaError;
+
+      // Create venta_items
+      const ventaItems = cart.map(item => ({
+        venta_id: venta.id,
+        producto_id: item.id,
+        cantidad: item.cantidad,
+        precio_unitario: item.precio + item.extrasTotal,
+        subtotal: (item.precio + item.extrasTotal) * item.cantidad,
+        agregos: item.extras.length > 0 ? JSON.stringify(item.extras) : null,
+      }));
+      
+      const { error: itemsError } = await supabase
+        .from("venta_items")
+        .insert(ventaItems);
+      if (itemsError) throw itemsError;
+
+      // Deduct stock
+      for (const item of cart) {
+        // Check if product has receta
+        const { data: recetas } = await supabase
+          .from("recetas")
+          .select("insumo_id, cantidad")
+          .eq("producto_final_id", item.id);
+
+        if (recetas && recetas.length > 0) {
+          // Deduct insumos based on receta
+          for (const receta of recetas) {
+            const cantidadDescontar = receta.cantidad * item.cantidad;
+            const { data: insumo } = await supabase
+              .from("inventario")
+              .select("stock")
+              .eq("id", receta.insumo_id)
+              .single();
+            if (insumo) {
+              await supabase
+                .from("inventario")
+                .update({ stock: Math.max(0, insumo.stock - cantidadDescontar) })
+                .eq("id", receta.insumo_id);
+            }
+          }
+        } else {
+          // Deduct the product itself
+          const { data: producto } = await supabase
+            .from("inventario")
+            .select("stock")
+            .eq("id", item.id)
+            .single();
+          
+          if (producto) {
+            await supabase
+              .from("inventario")
+              .update({ stock: Math.max(0, producto.stock - item.cantidad) })
+              .eq("id", item.id);
+          }
+        }
+      }
+
+      // Update mesa status if assigned
+      if (assignmentType === 'mesa' && assignmentId) {
+        await supabase
+          .from("mesas")
+          .update({ estado: 'libre' })
+          .eq("id", assignmentId);
+      }
+
+      return total;
+    },
+    onSuccess: (total) => {
+      queryClient.invalidateQueries({ queryKey: ["productos-venta"] });
+      queryClient.invalidateQueries({ queryKey: ["inventario"] });
+      toast.success(`Venta procesada por $${total.toFixed(2)}`);
+      setCart([]);
+      setAssignmentType('none');
+      setAssignmentId(null);
+    },
+    onError: (error) => {
+      toast.error("Error: " + error.message);
+    },
+  });
+
+  const processSale = (metodoPago: string) => {
     if (cart.length === 0) {
       toast.error("El carrito está vacío");
       return;
     }
-
-    toast.success(`Venta procesada por $${total.toFixed(2)} (${metodoPago})`);
-    setCart([]);
+    processSaleMutation.mutate(metodoPago);
   };
 
   if (roleLoading) {
@@ -166,11 +294,12 @@ export default function Ventas() {
                   <Card 
                     key={product.id} 
                     className="glass-card cursor-pointer hover:border-primary/50 transition-all duration-200 hover:shadow-glow"
-                    onClick={() => addToCart(product)}
+                    onClick={() => handleProductClick(product)}
                   >
                     <CardContent className="p-4">
-                      <div className="aspect-square bg-secondary/50 rounded-lg mb-3 flex items-center justify-center">
+                      <div className="aspect-square bg-secondary/50 rounded-lg mb-3 flex items-center justify-center relative">
                         <Package className="h-8 w-8 text-muted-foreground" />
+                        <Settings className="absolute top-2 right-2 h-4 w-4 text-muted-foreground/50" />
                       </div>
                       <h3 className="font-semibold text-foreground truncate">{product.nombre}</h3>
                       <div className="flex items-center justify-between mt-2">
@@ -195,6 +324,15 @@ export default function Ventas() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
+              {/* Assignment Selector */}
+              <AssignmentSelector
+                storeId={storeId}
+                assignmentType={assignmentType}
+                assignmentId={assignmentId}
+                onTypeChange={setAssignmentType}
+                onIdChange={setAssignmentId}
+              />
+
               {cart.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <ShoppingCart className="h-12 w-12 mx-auto mb-2 opacity-50" />
@@ -204,11 +342,16 @@ export default function Ventas() {
                 <>
                   <div className="space-y-3 max-h-64 overflow-auto">
                     {cart.map((item) => (
-                      <div key={item.id} className="flex items-center gap-3 p-2 bg-secondary/30 rounded-lg">
+                      <div key={item.cartItemId} className="flex items-start gap-3 p-2 bg-secondary/30 rounded-lg">
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-foreground truncate">{item.nombre}</p>
+                          {item.extras.length > 0 && (
+                            <p className="text-xs text-primary">
+                              + {item.extras.map(e => e.nombre).join(', ')}
+                            </p>
+                          )}
                           <p className="text-sm text-muted-foreground">
-                            ${item.precio.toFixed(2)} x {item.cantidad}
+                            ${(item.precio + item.extrasTotal).toFixed(2)} x {item.cantidad}
                           </p>
                         </div>
                         <div className="flex items-center gap-1">
@@ -216,7 +359,7 @@ export default function Ventas() {
                             variant="ghost" 
                             size="icon" 
                             className="h-7 w-7"
-                            onClick={() => updateQuantity(item.id, -1)}
+                            onClick={() => updateQuantity(item.cartItemId, -1)}
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
@@ -225,7 +368,7 @@ export default function Ventas() {
                             variant="ghost" 
                             size="icon" 
                             className="h-7 w-7"
-                            onClick={() => updateQuantity(item.id, 1)}
+                            onClick={() => updateQuantity(item.cartItemId, 1)}
                           >
                             <Plus className="h-3 w-3" />
                           </Button>
@@ -233,7 +376,7 @@ export default function Ventas() {
                             variant="ghost" 
                             size="icon" 
                             className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                            onClick={() => removeFromCart(item.id)}
+                            onClick={() => removeFromCart(item.cartItemId)}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -263,6 +406,7 @@ export default function Ventas() {
                     <Button 
                       className="gradient-primary"
                       onClick={() => processSale('Efectivo')}
+                      disabled={processSaleMutation.isPending}
                     >
                       <Banknote className="h-4 w-4 mr-2" />
                       Efectivo
@@ -270,6 +414,7 @@ export default function Ventas() {
                     <Button 
                       variant="outline"
                       onClick={() => processSale('Tarjeta')}
+                      disabled={processSaleMutation.isPending}
                     >
                       <CreditCard className="h-4 w-4 mr-2" />
                       Tarjeta
@@ -281,6 +426,17 @@ export default function Ventas() {
           </Card>
         </div>
       </div>
+
+      {/* Extras Modal */}
+      {selectedProduct && (
+        <ExtrasModal
+          open={extrasModalOpen}
+          onOpenChange={setExtrasModalOpen}
+          product={selectedProduct}
+          storeId={storeId}
+          onConfirm={handleAddToCart}
+        />
+      )}
     </AppLayout>
   );
 }
