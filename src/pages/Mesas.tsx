@@ -364,25 +364,18 @@ export default function MesasPage() {
             // Deduct insumos
             for (const receta of recetas) {
               const cantidadDescontar = receta.cantidad * detalle.cantidad;
-              await supabase.rpc('decrement_stock', { 
-                p_producto_id: receta.insumo_id, 
-                p_cantidad: cantidadDescontar 
-              }).catch(() => {
-                // If RPC doesn't exist, do manual update
-                supabase
+              // Manual update for stock
+              const { data: insumo } = await supabase
+                .from("inventario")
+                .select("stock")
+                .eq("id", receta.insumo_id)
+                .single();
+              if (insumo) {
+                await supabase
                   .from("inventario")
-                  .select("stock")
-                  .eq("id", receta.insumo_id)
-                  .single()
-                  .then(({ data: insumo }) => {
-                    if (insumo) {
-                      supabase
-                        .from("inventario")
-                        .update({ stock: Math.max(0, insumo.stock - cantidadDescontar) })
-                        .eq("id", receta.insumo_id);
-                    }
-                  });
-              });
+                  .update({ stock: Math.max(0, insumo.stock - cantidadDescontar) })
+                  .eq("id", receta.insumo_id);
+              }
             }
           } else {
             // Deduct the product itself
