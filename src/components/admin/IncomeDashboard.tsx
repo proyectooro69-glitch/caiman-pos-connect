@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseUntyped } from "@/lib/supabase-untyped";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -48,7 +48,7 @@ export function IncomeDashboard() {
         const start = startOfMonth(date);
         const end = endOfMonth(date);
         
-        const { data, error } = await supabase
+        const { data, error } = await supabaseUntyped
           .from("historial_pagos")
           .select("monto")
           .gte("fecha_pago", start.toISOString())
@@ -73,7 +73,7 @@ export function IncomeDashboard() {
   const { data: totalCollected, isLoading: isLoadingTotal } = useQuery<number>({
     queryKey: ["total-collected"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseUntyped
         .from("historial_pagos")
         .select("monto");
 
@@ -91,7 +91,7 @@ export function IncomeDashboard() {
       const start = startOfMonth(new Date());
       const end = endOfMonth(new Date());
 
-      const { data, error } = await supabase
+      const { data, error } = await supabaseUntyped
         .from("historial_pagos")
         .select("monto")
         .gte("fecha_pago", start.toISOString())
@@ -111,7 +111,7 @@ export function IncomeDashboard() {
       const today = new Date().toISOString().split("T")[0];
 
       // Check suscripciones table for expired
-      const { data: expiredSubs, error: subsError } = await supabase
+      const { data: expiredSubs, error: subsError } = await supabaseUntyped
         .from("suscripciones")
         .select(`
           id,
@@ -128,13 +128,13 @@ export function IncomeDashboard() {
       if (subsError) throw subsError;
 
       // Also check puntos_venta for stores without subscriptions or with past fecha_vencimiento
-      const { data: allStores, error: storesError } = await supabase
+      const { data: allStores, error: storesError } = await supabaseUntyped
         .from("puntos_venta")
         .select("id, nombre, fecha_vencimiento");
 
       if (storesError) throw storesError;
 
-      const typedExpiredSubs = (expiredSubs || []) as Array<{
+      const typedExpiredSubs = (expiredSubs || []) as unknown as Array<{
         id: string;
         store_id: string;
         fecha_vencimiento: string | null;
