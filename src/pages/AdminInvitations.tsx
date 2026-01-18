@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseUntyped } from "@/lib/supabase-untyped";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -36,7 +36,17 @@ import {
   Trash2
 } from "lucide-react";
 import { toast } from "sonner";
-import type { AppRole, Invitation } from "@/types/database";
+import type { AppRole } from "@/types/database";
+
+interface Invitation {
+  id: string;
+  email: string;
+  role: AppRole;
+  store_id: string | null;
+  invited_by: string | null;
+  used_at: string | null;
+  created_at: string;
+}
 
 export default function AdminInvitations() {
   const { isAdmin, loading: roleLoading } = useUserRole();
@@ -53,7 +63,7 @@ export default function AdminInvitations() {
   const { data: invitations = [], isLoading: invitationsLoading } = useQuery({
     queryKey: ['admin-invitations'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseUntyped
         .from('invitations')
         .select('*')
         .order('created_at', { ascending: false });
@@ -68,7 +78,7 @@ export default function AdminInvitations() {
   const { data: stores = [] } = useQuery({
     queryKey: ['stores'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseUntyped
         .from('puntos_venta')
         .select('id, nombre')
         .order('nombre');
@@ -82,14 +92,14 @@ export default function AdminInvitations() {
   // Create invitation mutation
   const createInvitationMutation = useMutation({
     mutationFn: async (inviteData: { email: string; role: AppRole; store_id: string }) => {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseUntyped
         .from('invitations')
         .insert({
           email: inviteData.email.toLowerCase().trim(),
           role: inviteData.role,
           store_id: inviteData.store_id || null,
           invited_by: user?.id,
-        } as any)
+        })
         .select()
         .single();
 
@@ -114,7 +124,7 @@ export default function AdminInvitations() {
   // Delete invitation mutation
   const deleteInvitationMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await supabaseUntyped
         .from('invitations')
         .delete()
         .eq('id', id);
@@ -260,7 +270,7 @@ export default function AdminInvitations() {
                     <SelectValue placeholder="Seleccionar tienda" />
                   </SelectTrigger>
                   <SelectContent>
-                    {stores.map((store) => (
+                    {stores.map((store: { id: string; nombre: string }) => (
                       <SelectItem key={store.id} value={store.id}>
                         <div className="flex items-center gap-2">
                           <Store className="h-4 w-4" />
@@ -330,7 +340,7 @@ export default function AdminInvitations() {
                 </TableHeader>
                 <TableBody>
                   {invitations.map((inv) => {
-                    const store = stores.find(s => s.id === inv.store_id);
+                    const store = stores.find((s: { id: string; nombre: string }) => s.id === inv.store_id);
                     return (
                       <TableRow key={inv.id}>
                         <TableCell>

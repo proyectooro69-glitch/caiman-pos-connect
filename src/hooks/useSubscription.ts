@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabaseUntyped } from '@/lib/supabase-untyped';
 import { useUserRole } from './useUserRole';
 
 interface SubscriptionData {
@@ -44,7 +44,7 @@ export const useSubscription = (): SubscriptionData => {
 
       try {
         // Check suscripciones table first
-        const { data: suscripcion, error } = await supabase
+        const { data: suscripcion, error } = await supabaseUntyped
           .from('suscripciones')
           .select('fecha_vencimiento, estado')
           .eq('store_id', storeId)
@@ -53,7 +53,7 @@ export const useSubscription = (): SubscriptionData => {
         if (error) {
           console.error('Error checking subscription:', error);
           // Fallback to puntos_venta
-          const { data: store } = await supabase
+          const { data: store } = await supabaseUntyped
             .from('puntos_venta')
             .select('fecha_vencimiento')
             .eq('id', storeId)
@@ -86,7 +86,7 @@ export const useSubscription = (): SubscriptionData => {
 
         if (!suscripcion) {
           // No subscription record, check puntos_venta as fallback
-          const { data: store } = await supabase
+          const { data: store } = await supabaseUntyped
             .from('puntos_venta')
             .select('fecha_vencimiento')
             .eq('id', storeId)
