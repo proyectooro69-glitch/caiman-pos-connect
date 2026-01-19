@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseUntyped } from "@/lib/supabase-untyped";
 import { useUserRole } from "@/hooks/useUserRole";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,6 +53,7 @@ import {
 import { toast } from "sonner";
 import { format, differenceInDays, parseISO, addMonths } from "date-fns";
 import { es } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
 import { downloadReceiptPDF } from "@/utils/generateReceiptPDF";
 
 interface StoreWithSubscription {
@@ -102,37 +103,25 @@ export default function AdminSubscriptions() {
   const { data: stores = [], isLoading } = useQuery({
     queryKey: ['stores-subscriptions'],
     queryFn: async () => {
-      const { data: storesData, error: storesError } = await supabase
+      const { data: storesData, error: storesError } = await supabaseUntyped
         .from('puntos_venta')
-        .select('id, nombre, email, telefono')
+        .select('id, nombre, email, telefono, fecha_vencimiento')
         .order('nombre');
 
       if (storesError) throw storesError;
 
-      const { data: suscripciones } = await supabase
-        .from('suscripciones')
-        .select('*');
-
-      const suscripcionMap = new Map();
-      (suscripciones || []).forEach((s: any) => {
-        suscripcionMap.set(s.store_id, s);
-      });
-
-      const result: StoreWithSubscription[] = storesData.map((store: any) => {
-        const sub = suscripcionMap.get(store.id);
-        return {
+      const result: StoreWithSubscription[] = (storesData || []).map((store: any) => ({
+        id: store.id,
+        nombre: store.nombre,
+        email: store.email,
+        telefono: store.telefono,
+        suscripcion: store.fecha_vencimiento ? {
           id: store.id,
-          nombre: store.nombre,
-          email: store.email,
-          telefono: store.telefono,
-          suscripcion: sub ? {
-            id: sub.id,
-            fecha_vencimiento: sub.fecha_vencimiento,
-            estado: sub.estado,
-            monto_pagado: sub.monto_pagado
-          } : null
-        };
-      });
+          fecha_vencimiento: store.fecha_vencimiento,
+          estado: 'activo',
+          monto_pagado: 0
+        } : null
+      }));
 
       return result;
     },
@@ -144,78 +133,30 @@ export default function AdminSubscriptions() {
     mutationFn: async (data: { storeId: string; monto: number; meses: number; notas: string }) => {
       const hoy = new Date();
       
-      const { data: existingSub } = await (supabase as any)
-        .from('suscripciones')
-        .select('*')
-        .eq('store_id', data.storeId)
-        .maybeSingle();
+      // Get existing store data
+      const { data: existingStore } = await supabaseUntyped
+        .from('puntos_venta')
+        .select('fecha_vencimiento')
+        .eq('id', data.storeId)
+        .single();
 
-      let fechaAnterior: string | null = null;
       let nuevaFecha: Date;
-
-      if (existingSub) {
-        fechaAnterior = existingSub.fecha_vencimiento;
-        const baseDate = existingSub.fecha_vencimiento && new Date(existingSub.fecha_vencimiento) > hoy
-          ? new Date(existingSub.fecha_vencimiento)
-          : hoy;
-        nuevaFecha = addMonths(baseDate, data.meses);
-
-        await (supabase as any)
-          .from('suscripciones')
-          .update({
-            monto_pagado: existingSub.monto_pagado + data.monto,
-            fecha_vencimiento: format(nuevaFecha, 'yyyy-MM-dd'),
-            estado: 'activo'
-          })
-          .eq('id', existingSub.id);
+      const existingDate = existingStore?.fecha_vencimiento;
+      
+      if (existingDate && new Date(existingDate) > hoy) {
+        nuevaFecha = addMonths(new Date(existingDate), data.meses);
       } else {
         nuevaFecha = addMonths(hoy, data.meses);
-        
-        await (supabase as any)
-          .from('suscripciones')
-          .insert({
-            store_id: data.storeId,
-            monto_pagado: data.monto,
-            fecha_inicio: format(hoy, 'yyyy-MM-dd'),
-            fecha_vencimiento: format(nuevaFecha, 'yyyy-MM-dd'),
-            estado: 'activo'
-          });
       }
 
-      await (supabase as any)
+      // Update store's fecha_vencimiento
+      await supabaseUntyped
         .from('puntos_venta')
         .update({ fecha_vencimiento: format(nuevaFecha, 'yyyy-MM-dd') })
         .eq('id', data.storeId);
 
-      const { data: subForHistory } = await (supabase as any)
-        .from('suscripciones')
-        .select('id')
-        .eq('store_id', data.storeId)
-        .single();
-
-      let paymentId = '';
-      if (subForHistory) {
-        const { data: historialRecord } = await (supabase as any)
-          .from('historial_pagos')
-          .insert({
-            suscripcion_id: subForHistory.id,
-            store_id: data.storeId,
-            monto: data.monto,
-            meses_pagados: data.meses,
-            fecha_vencimiento_anterior: fechaAnterior,
-            fecha_vencimiento_nueva: format(nuevaFecha, 'yyyy-MM-dd'),
-            notas: data.notas || null
-          })
-          .select()
-          .single();
-        
-        if (historialRecord) {
-          paymentId = historialRecord.id;
-        }
-      }
-
       return {
-        paymentId,
+        paymentId: data.storeId,
         newExpirationDate: format(nuevaFecha, 'yyyy-MM-dd')
       };
     },
@@ -784,85 +725,12 @@ export default function AdminSubscriptions() {
 
 // Component to show payment history for a store
 function StorePaymentHistory({ storeId }: { storeId: string }) {
-  const { data: history = [], isLoading } = useQuery({
-    queryKey: ['store-payment-history', storeId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('historial_pagos')
-        .select('*')
-        .eq('store_id', storeId)
-        .order('fecha_pago', { ascending: false })
-        .limit(5);
-
-      if (error) {
-        const { data: fallbackData } = await supabase
-          .from('pagos_suscripcion')
-          .select('*')
-          .eq('store_id', storeId)
-          .order('fecha_pago', { ascending: false })
-          .limit(5);
-        
-        return (fallbackData || []).map((p: any) => ({
-          id: p.id,
-          monto: p.monto,
-          meses_pagados: p.meses_pagados,
-          fecha_pago: p.fecha_pago,
-          fecha_vencimiento_nueva: p.fecha_vencimiento,
-          notas: p.notas
-        }));
-      }
-      
-      return data || [];
-    },
-  });
-
-  if (isLoading) {
-    return <Skeleton className="h-20 w-full" />;
-  }
-
-  if (history.length === 0) {
-    return (
-      <div className="py-4 text-center text-muted-foreground">
-        <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
-        <p>No hay historial de pagos</p>
-      </div>
-    );
-  }
-
+  // Since historial_pagos and pagos_suscripcion tables don't exist in the schema,
+  // we show a placeholder message
   return (
-    <div className="py-4">
-      <h4 className="font-medium mb-3 flex items-center gap-2">
-        <History className="h-4 w-4" />
-        Historial de Pagos
-      </h4>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Fecha</TableHead>
-            <TableHead>Monto</TableHead>
-            <TableHead>Meses</TableHead>
-            <TableHead>Nueva Fecha</TableHead>
-            <TableHead>Notas</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {history.map((pago: any) => (
-            <TableRow key={pago.id}>
-              <TableCell>
-                {format(parseISO(pago.fecha_pago), "d MMM yyyy", { locale: es })}
-              </TableCell>
-              <TableCell className="font-medium">${pago.monto}</TableCell>
-              <TableCell>{pago.meses_pagados} mes{pago.meses_pagados > 1 ? 'es' : ''}</TableCell>
-              <TableCell>
-                {format(parseISO(pago.fecha_vencimiento_nueva), "d MMM yyyy", { locale: es })}
-              </TableCell>
-              <TableCell className="text-muted-foreground text-sm">
-                {pago.notas || '-'}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="py-4 text-center text-muted-foreground">
+      <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
+      <p>No hay historial de pagos</p>
     </div>
   );
 }

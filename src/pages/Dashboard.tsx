@@ -24,10 +24,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IncomeDashboard } from "@/components/admin/IncomeDashboard";
-import type { Inventario, ProductCategory } from "@/types/database";
+import type { Tables } from "@/integrations/supabase/types";
+
+type InventarioRow = Tables<"inventario">;
 
 // Categories from database
-const categoryLabels: Record<ProductCategory, string> = {
+const categoryLabels: Record<string, string> = {
   bebidas: "Bebidas",
   alimentos: "Alimentos",
   productos_limpieza: "Limpieza",
@@ -48,7 +50,7 @@ const Dashboard = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("Todos");
-  const [products, setProducts] = useState<Inventario[]>([]);
+  const [products, setProducts] = useState<InventarioRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [storesCount, setStoresCount] = useState<number | null>(null);
   const [storesCountLoading, setStoresCountLoading] = useState(false);
@@ -105,12 +107,12 @@ const Dashboard = () => {
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.nombre.toLowerCase().includes(searchTerm.toLowerCase());
-    const categoryLabel = categoryLabels[product.categoria];
+    const categoryLabel = product.categoria ? categoryLabels[product.categoria] : null;
     const matchesCategory = selectedCategory === "Todos" || categoryLabel === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const addToCart = (product: Inventario) => {
+  const addToCart = (product: InventarioRow) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
@@ -280,7 +282,7 @@ const Dashboard = () => {
                     <h3 className="font-medium text-foreground text-sm mb-1 line-clamp-2">
                       {product.nombre}
                     </h3>
-                    <p className="text-xs text-muted-foreground mb-2">{categoryLabels[product.categoria]}</p>
+                    <p className="text-xs text-muted-foreground mb-2">{product.categoria ? categoryLabels[product.categoria] : 'Otros'}</p>
                     <div className="flex items-center justify-between">
                       <span className="text-lg font-bold text-primary">
                         ${product.precio.toFixed(2)}
@@ -465,7 +467,7 @@ const Dashboard = () => {
                       <h3 className="font-medium text-foreground text-sm mb-1 line-clamp-2">
                         {product.nombre}
                       </h3>
-                      <p className="text-xs text-muted-foreground mb-2">{categoryLabels[product.categoria]}</p>
+                      <p className="text-xs text-muted-foreground mb-2">{product.categoria ? categoryLabels[product.categoria] : 'Otros'}</p>
                       <div className="flex items-center justify-between">
                         <span className="text-lg font-bold text-primary">
                           ${product.precio.toFixed(2)}
