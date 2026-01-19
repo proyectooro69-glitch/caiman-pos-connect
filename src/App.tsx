@@ -17,6 +17,9 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminStores from "./pages/AdminStores";
 import AdminInvitations from "./pages/AdminInvitations";
 import AdminSubscriptions from "./pages/AdminSubscriptions";
+import AdminSettings from "./pages/AdminSettings";
+import VentaExterna from "./pages/VentaExterna";
+import Catalogo from "./pages/Catalogo";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -120,6 +123,25 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/admin/settings"
+              element={
+                <ProtectedRoute>
+                  <AdminSettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/venta-externa"
+              element={
+                <ProtectedRoute>
+                  <SubscriptionBlocker>
+                    <VentaExterna />
+                  </SubscriptionBlocker>
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/catalogo/:storeId" element={<Catalogo />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
