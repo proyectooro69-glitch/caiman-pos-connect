@@ -28,6 +28,9 @@ import {
   CartesianGrid, 
   Tooltip as RechartsTooltip, 
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +52,16 @@ const weeklySalesData = [
   { name: 'Sab', sales: 2390 },
   { name: 'Dom', sales: 3490 },
 ];
+
+const topProductsData = [
+  { name: 'Producto A', value: 400 },
+  { name: 'Producto B', value: 300 },
+  { name: 'Producto C', value: 300 },
+  { name: 'Producto D', value: 200 },
+  { name: 'Producto E', value: 100 },
+];
+
+const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 type InventarioRow = Tables<"inventario">;
 
@@ -274,7 +287,7 @@ const Dashboard = () => {
                 </Card>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-10 gap-4">
                 <Card className="lg:col-span-4 glass-card">
                   <CardHeader>
                     <CardTitle>Ventas Semanales</CardTitle>
@@ -293,6 +306,35 @@ const Dashboard = () => {
                     </div>
                   </CardContent>
                 </Card>
+                
+                <Card className="lg:col-span-3 glass-card">
+                  <CardHeader>
+                    <CardTitle>Top 5 Productos</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={topProductsData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            {topProductsData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Card className="lg:col-span-3 glass-card">
                   <CardHeader>
                     <CardTitle>Accesos Directos</CardTitle>
