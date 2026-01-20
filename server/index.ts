@@ -1,11 +1,18 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
+import path from "path";
+import cors from "cors";
 import cron from "node-cron";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { sendSubscriptionEmail, checkExpiringSubscriptions } from "./email";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -98,6 +105,13 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   } else {
     serveStatic(app);
   }
+
+  // SPA Catch-all route for production
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.resolve(__dirname, '../dist/public/index.html'));
+    }
+  });
 
   const port = process.env.PORT || 10000;
   server.listen(Number(port), "0.0.0.0", () => {
