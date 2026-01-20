@@ -1,8 +1,44 @@
 import type { Express } from "express";
 import { storage } from "./storage";
 import * as schema from "@shared/schema";
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export function registerRoutes(app: Express) {
+  // Proxy for public products
+  app.get("/api/proxy/products", async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('inventario')
+        .select('*')
+        .eq('tipo', 'producto_final');
+      
+      if (error) throw error;
+      res.json(data);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Proxy for store config (PDF/QR urls)
+  app.get("/api/proxy/config/:storeId", async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('configuracion_tienda')
+        .select('*')
+        .eq('punto_venta_id', req.params.storeId)
+        .maybeSingle();
+      
+      if (error) throw error;
+      res.json(data);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/puntos-venta", async (req, res) => {
     try {
       const puntosVenta = await storage.getPuntosVenta();

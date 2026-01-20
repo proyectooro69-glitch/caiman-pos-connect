@@ -39,7 +39,7 @@ export async function setupVite(app: Express, server: any) {
   });
 
   app.use(vite.middlewares);
-  app.use("*", async (req, res, next) => {
+  app.get(/^(?!\/api).*/, async (req, res, next) => {
     const url = req.originalUrl;
 
     try {
@@ -65,7 +65,7 @@ export function serveStatic(app: Express) {
 
   app.use(express.static(distPath));
 
-  app.use("*", (_req, res) => {
+  app.get(/^(?!\/api).*/, (req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

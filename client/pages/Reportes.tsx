@@ -57,18 +57,15 @@ export default function Reportes() {
   const { data: salesSummary, isLoading: salesLoading } = useQuery({
     queryKey: ['sales-summary', storeId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('ventas')
-        .select('total, created_at')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      if (!storeId) return null;
+      const response = await fetch(`/api/ventas?puntoVentaId=${storeId}`);
+      if (!response.ok) throw new Error('Failed to fetch sales');
+      const salesData = await response.json() || [];
       
-      const salesData = data ?? [];
       const today = new Date().toDateString();
-      const ventasHoy = salesData.filter(v => new Date(v.created_at).toDateString() === today);
-      const totalHoy = ventasHoy.reduce((sum, v) => sum + v.total, 0);
-      const totalGeneral = salesData.reduce((sum, v) => sum + v.total, 0);
+      const ventasHoy = salesData.filter((v: any) => new Date(v.created_at).toDateString() === today);
+      const totalHoy = ventasHoy.reduce((sum: number, v: any) => sum + Number(v.total), 0);
+      const totalGeneral = salesData.reduce((sum: number, v: any) => sum + Number(v.total), 0);
       
       return {
         ventasHoy: ventasHoy.length,
@@ -84,16 +81,14 @@ export default function Reportes() {
   const { data: inventoryStats, isLoading: inventoryLoading } = useQuery({
     queryKey: ['inventory-stats', storeId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('inventario')
-        .select('stock, stock_minimo, precio');
-
-      if (error) throw error;
+      if (!storeId) return null;
+      const response = await fetch(`/api/inventario?puntoVentaId=${storeId}`);
+      if (!response.ok) throw new Error('Failed to fetch inventory');
+      const inventoryData = await response.json() || [];
       
-      const inventoryData = data ?? [];
-      const lowStock = inventoryData.filter(p => p.stock <= p.stock_minimo).length;
+      const lowStock = inventoryData.filter((p: any) => p.stock <= p.stock_minimo).length;
       const totalProducts = inventoryData.length;
-      const inventoryValue = inventoryData.reduce((sum, p) => sum + (p.stock * p.precio), 0);
+      const inventoryValue = inventoryData.reduce((sum: number, p: any) => sum + (p.stock * p.precio), 0);
       
       return { lowStock, totalProducts, inventoryValue };
     },

@@ -52,18 +52,14 @@ export default function AdminSettings() {
   });
   const [uploading, setUploading] = useState(false);
 
-  // Fetch existing config
+  // Fetch existing config via proxy
   const { data: config, isLoading: configLoading } = useQuery({
     queryKey: ["store-config", storeId],
     queryFn: async () => {
       if (!storeId) return null;
-      const { data, error } = await supabase
-        .from("configuracion_tienda")
-        .select("*")
-        .eq("punto_venta_id", storeId)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
+      const response = await fetch(`/api/proxy/config/${storeId}`);
+      if (!response.ok) throw new Error('Failed to fetch config');
+      return response.json();
     },
     enabled: !roleLoading && !!storeId,
   });
@@ -88,38 +84,25 @@ export default function AdminSettings() {
     mutationFn: async (data: Partial<StoreConfig>) => {
       if (!storeId) throw new Error("No store ID");
       
-      if (config?.id) {
-        // Update existing
-        const { error } = await supabase
-          .from("configuracion_tienda")
-          .update({
-            nombre_negocio: data.nombre_negocio,
-            whatsapp: data.whatsapp,
-            direccion: data.direccion,
-            pdf_tarjeta_url: data.pdf_tarjeta_url,
-            logo_url: data.logo_url,
-            descripcion: data.descripcion,
-            horario: data.horario,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", config.id);
-        if (error) throw error;
-      } else {
-        // Create new
-        const { error } = await supabase
-          .from("configuracion_tienda")
-          .insert({
-            punto_venta_id: storeId,
-            nombre_negocio: data.nombre_negocio,
-            whatsapp: data.whatsapp,
-            direccion: data.direccion,
-            pdf_tarjeta_url: data.pdf_tarjeta_url,
-            logo_url: data.logo_url,
-            descripcion: data.descripcion,
-            horario: data.horario,
-          });
-        if (error) throw error;
+      const method = config?.id ? "PATCH" : "POST";
+      const url = config?.id 
+        ? `/api/configuracion-tienda/${storeId}`
+        : `/api/configuracion-tienda`;
+
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...data,
+          punto_venta_id: storeId,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to save configuration");
       }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["store-config"] });

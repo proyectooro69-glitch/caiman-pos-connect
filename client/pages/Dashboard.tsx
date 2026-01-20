@@ -95,25 +95,24 @@ const Dashboard = () => {
   const { toast } = useToast();
   const { role, isAdmin, isSupervisor, isVendedor } = useUserRole();
 
-  // Fetch products from Supabase
+  // Fetch products via proxy
   useEffect(() => {
     const fetchProducts = async () => {
-      const { data, error } = await supabase
-        .from('inventario')
-        .select('*')
-        .eq('tipo', 'producto_final');
-      
-      if (error) {
+      try {
+        const response = await fetch('/api/proxy/products');
+        if (!response.ok) throw new Error('Failed to fetch products');
+        const data = await response.json();
+        setProducts(data || []);
+      } catch (error: any) {
         console.error('Error fetching products:', error);
         toast({
           title: "Error",
           description: "No se pudieron cargar los productos",
           variant: "destructive",
         });
-      } else {
-        setProducts(data || []);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchProducts();
@@ -123,17 +122,14 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchStoresCount = async () => {
       if (!isAdmin) return;
-      setStoresCountLoading(true);
-      const { count, error } = await supabase
-        .from('puntos_venta')
-        .select('id', { head: true, count: 'exact' });
-
-      if (error) {
+      try {
+        const response = await fetch('/api/puntos-venta');
+        if (!response.ok) throw new Error('Failed to fetch stores');
+        const data = await response.json();
+        setStoresCount(data?.length || 0);
+      } catch (error: any) {
         console.error('Error fetching stores count:', error);
-      } else {
-        setStoresCount(count ?? 0);
       }
-      setStoresCountLoading(false);
     };
 
     fetchStoresCount();
