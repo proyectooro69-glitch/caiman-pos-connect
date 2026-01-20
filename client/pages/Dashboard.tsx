@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
+  TrendingUp,
   ShoppingCart, 
   Search, 
   Plus, 
@@ -14,7 +15,20 @@ import {
   Store,
   Settings,
   BarChart3,
+  AlertTriangle,
+  Activity,
+  ArrowUpRight,
+  DollarSign
 } from "lucide-react";
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip as RechartsTooltip, 
+  ResponsiveContainer,
+} from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +39,16 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IncomeDashboard } from "@/components/admin/IncomeDashboard";
 import type { Tables } from "@/integrations/supabase/types";
+
+const weeklySalesData = [
+  { name: 'Lun', sales: 4000 },
+  { name: 'Mar', sales: 3000 },
+  { name: 'Mie', sales: 2000 },
+  { name: 'Jue', sales: 2780 },
+  { name: 'Vie', sales: 1890 },
+  { name: 'Sab', sales: 2390 },
+  { name: 'Dom', sales: 3490 },
+];
 
 type InventarioRow = Tables<"inventario">;
 
@@ -204,7 +228,88 @@ const Dashboard = () => {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="ingresos">
+            <TabsContent value="ingresos" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="glass-card">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Ventas Hoy</CardTitle>
+                    <DollarSign className="h-4 w-4 text-primary" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">$1,284.50</div>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <ArrowUpRight className="h-3 w-3 text-green-500" /> +12% vs ayer
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="glass-card">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Estado Caja</CardTitle>
+                    <Activity className="h-4 w-4 text-primary" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Abierta</div>
+                    <p className="text-xs text-muted-foreground">Iniciada 08:00 AM</p>
+                  </CardContent>
+                </Card>
+                <Card className="glass-card">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Stock Bajo</CardTitle>
+                    <AlertTriangle className="h-4 w-4 text-destructive" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-destructive">8 Items</div>
+                    <p className="text-xs text-muted-foreground">Requieren atención</p>
+                  </CardContent>
+                </Card>
+                <Card className="glass-card">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Actividad</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">128</div>
+                    <p className="text-xs text-muted-foreground">Ventas totales mes</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
+                <Card className="lg:col-span-4 glass-card">
+                  <CardHeader>
+                    <CardTitle>Ventas Semanales</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={weeklySalesData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis />
+                          <RechartsTooltip />
+                          <Bar dataKey="sales" fill="#10b981" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="lg:col-span-3 glass-card">
+                  <CardHeader>
+                    <CardTitle>Accesos Directos</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 gap-2">
+                    <Button variant="outline" className="justify-start" asChild>
+                      <Link to="/ventas"><ShoppingCart className="mr-2 h-4 w-4"/> Módulo Ventas</Link>
+                    </Button>
+                    <Button variant="outline" className="justify-start" asChild>
+                      <Link to="/inventario"><Package className="mr-2 h-4 w-4"/> Módulo Logística</Link>
+                    </Button>
+                    <Button variant="outline" className="justify-start" asChild>
+                      <Link to="/admin/settings"><Settings className="mr-2 h-4 w-4"/> Módulo Administración</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
               <IncomeDashboard />
             </TabsContent>
 
@@ -213,6 +318,23 @@ const Dashboard = () => {
 
           {/* Products Section */}
           <div className="lg:col-span-2 space-y-4">
+            {/* Quick Access Grid for Supervisor */}
+            {isSupervisor && (
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <Button variant="outline" className="h-24 flex flex-col gap-2" asChild>
+                  <Link to="/ventas">
+                    <ShoppingCart className="h-6 w-6" />
+                    <span>Ventas</span>
+                  </Link>
+                </Button>
+                <Button variant="outline" className="h-24 flex flex-col gap-2" asChild>
+                  <Link to="/inventario">
+                    <Package className="h-6 w-6" />
+                    <span>Logística</span>
+                  </Link>
+                </Button>
+              </div>
+            )}
             {/* Search & Categories */}
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1 relative">

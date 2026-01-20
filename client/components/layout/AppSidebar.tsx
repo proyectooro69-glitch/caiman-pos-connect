@@ -46,41 +46,51 @@ export function AppSidebar() {
   // Menu items by role
   const getMenuItems = () => {
     const baseItems = [
-      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, roles: ['administrador', 'supervisor', 'vendedor'] },
+      { 
+        title: "Ventas", 
+        icon: ShoppingCart, 
+        items: [
+          { title: "POS", url: "/ventas", roles: ['administrador', 'supervisor', 'vendedor'] },
+          { title: "Mesas", url: "/mesas", roles: ['administrador', 'supervisor', 'vendedor'] },
+          { title: "Clientes", url: "/clientes", roles: ['administrador', 'supervisor', 'vendedor'] },
+          { title: "Venta Externa", url: "/venta-externa", roles: ['administrador', 'supervisor', 'vendedor'] },
+        ] 
+      },
+      { 
+        title: "Logística", 
+        icon: Package, 
+        items: [
+          { title: "Inventario", url: "/inventario", roles: ['administrador', 'supervisor'] },
+          { title: "Recetas", url: "/recetas", roles: ['administrador', 'supervisor'] },
+        ] 
+      },
+      { 
+        title: "Administración", 
+        icon: LayoutDashboard, 
+        items: [
+          { title: "Dashboard", url: "/dashboard", roles: ['administrador'] },
+          { title: "Reportes", url: "/reportes", roles: ['administrador'] },
+          { title: "Configuración", url: "/admin/settings", roles: ['administrador'] },
+        ] 
+      },
     ];
 
-    const vendedorItems = [
-      { title: "Punto de Venta", url: "/ventas", icon: ShoppingCart, roles: ['administrador', 'supervisor', 'vendedor'] },
-      { title: "Mesas", url: "/mesas", icon: ChefHat, roles: ['administrador', 'supervisor', 'vendedor'] },
-    ];
-
-    const supervisorItems = [
-      { title: "Inventario", url: "/inventario", icon: Package, roles: ['administrador', 'supervisor'] },
-      { title: "Reportes", url: "/reportes", icon: BarChart3, roles: ['administrador', 'supervisor'] },
-      { title: "Clientes", url: "/clientes", icon: Users, roles: ['administrador', 'supervisor'] },
-    ];
-
-    const adminItems = [
-      { title: "Puntos de Venta", url: "/admin/stores", icon: Store, roles: ['administrador'] },
-      { title: "Suscripciones", url: "/admin/subscriptions", icon: CreditCard, roles: ['administrador', 'supervisor'] },
-      { title: "Invitaciones", url: "/admin/invitations", icon: UserPlus, roles: ['administrador'] },
-      { title: "Gestión Usuarios", url: "/admin/users", icon: UserCog, roles: ['administrador'] },
-      { title: "Configuración", url: "/admin/settings", icon: Settings, roles: ['administrador'] },
-    ];
-
-    return [...baseItems, ...vendedorItems, ...supervisorItems, ...adminItems];
+    return baseItems.map(group => ({
+      ...group,
+      items: group.items.filter(item => {
+        if (!role) return item.roles.includes('vendedor');
+        return item.roles.includes(role);
+      })
+    })).filter(group => group.items.length > 0);
   };
 
-  const menuItems = getMenuItems().filter(item => {
-    if (!role) return item.roles.includes('vendedor'); // Default to vendedor view
-    return item.roles.includes(role);
-  });
+  const menuGroups = getMenuItems();
 
   const getRoleBadge = () => {
     if (loading) return <Skeleton className="h-5 w-16" />;
     
     const roleConfig = {
-      administrador: { label: 'Super Admin', className: 'bg-primary/20 text-primary border-primary/30' },
+      administrador: { label: 'Admin', className: 'bg-primary/20 text-primary border-primary/30' },
       supervisor: { label: 'Supervisor', className: 'bg-warning/20 text-warning border-warning/30' },
       vendedor: { label: 'Vendedor', className: 'bg-accent/20 text-accent border-accent/30' },
     };
@@ -112,34 +122,36 @@ export function AppSidebar() {
       </div>
 
       <SidebarContent className="px-2">
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider">
-            {!collapsed && "Menú Principal"}
-          </SidebarGroupLabel>
+        {menuGroups.map((group) => (
+          <SidebarGroup key={group.title}>
+            <SidebarGroupLabel className="text-muted-foreground text-xs uppercase tracking-wider">
+              {!collapsed && group.title}
+            </SidebarGroupLabel>
 
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink 
-                      to={item.url} 
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
-                        isActive(item.url) 
-                          ? 'bg-primary/15 text-primary border border-primary/20' 
-                          : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-                      }`}
-                      activeClassName=""
-                    >
-                      <item.icon className="h-5 w-5 flex-shrink-0" />
-                      {!collapsed && <span className="font-medium">{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink 
+                        to={item.url} 
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
+                          isActive(item.url) 
+                            ? 'bg-primary/15 text-primary border border-primary/20' 
+                            : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                        }`}
+                        activeClassName=""
+                      >
+                        <group.icon className="h-5 w-5 flex-shrink-0" />
+                        {!collapsed && <span className="font-medium">{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       <SidebarFooter className="p-4 border-t border-sidebar-border">

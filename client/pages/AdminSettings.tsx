@@ -130,25 +130,25 @@ export default function AdminSettings() {
     },
   });
 
-  // Upload PDF handler
-  const handleUploadPDF = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Upload PDF/Image handler
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'pdf' | 'qr') => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    if (file.type !== "application/pdf") {
+    if (type === 'pdf' && file.type !== "application/pdf") {
       toast.error("Solo se permiten archivos PDF");
       return;
     }
     
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("El archivo debe ser menor a 10MB");
+    if (type === 'qr' && !file.type.startsWith('image/')) {
+      toast.error("Solo se permiten imágenes");
       return;
     }
 
     setUploading(true);
     try {
-      const fileExt = "pdf";
-      const fileName = `${storeId}-tarjeta-${Date.now()}.${fileExt}`;
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${storeId}-${type}-${Date.now()}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
         .from("tarjetas-digitales")
@@ -160,10 +160,15 @@ export default function AdminSettings() {
         .from("tarjetas-digitales")
         .getPublicUrl(fileName);
 
-      setFormData(prev => ({ ...prev, pdf_tarjeta_url: publicUrl }));
-      toast.success("PDF subido correctamente");
-    } catch (error: unknown) {
-      toast.error("Error al subir PDF: " + (error as Error).message);
+      if (type === 'pdf') {
+        setFormData(prev => ({ ...prev, pdf_tarjeta_url: publicUrl }));
+        toast.success("Menú PDF subido correctamente");
+      } else {
+        setFormData(prev => ({ ...prev, logo_url: publicUrl }));
+        toast.success("Imagen de QR subida correctamente");
+      }
+    } catch (error: any) {
+      toast.error("Error al subir archivo: " + error.message);
     } finally {
       setUploading(false);
     }
@@ -351,82 +356,71 @@ export default function AdminSettings() {
               </CardContent>
             </Card>
 
-            {/* PDF Upload */}
+            {/* PDF & QR Upload */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
-                  Tarjeta Digital (PDF)
+                  Archivos del Negocio
                 </CardTitle>
                 <CardDescription>
-                  Sube tu menú o catálogo en PDF para compartir via QR
+                  Sube tu menú en PDF y la imagen de tu código QR
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleUploadPDF}
-                    className="hidden"
-                    id="pdf-upload"
-                    disabled={uploading}
-                  />
-                  <label 
-                    htmlFor="pdf-upload" 
-                    className="cursor-pointer flex flex-col items-center"
-                  >
-                    <Upload className="h-10 w-10 text-muted-foreground mb-2" />
-                    <span className="text-sm font-medium">
-                      {uploading ? "Subiendo..." : "Haz clic para subir PDF"}
-                    </span>
-                    <span className="text-xs text-muted-foreground mt-1">
-                      Máximo 10MB
-                    </span>
-                  </label>
+              <CardContent className="space-y-6">
+                {/* PDF Upload */}
+                <div className="space-y-2">
+                  <Label>Menú Digital (PDF)</Label>
+                  <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => handleUpload(e, 'pdf')}
+                      className="hidden"
+                      id="pdf-upload"
+                      disabled={uploading}
+                    />
+                    <label htmlFor="pdf-upload" className="cursor-pointer flex flex-col items-center">
+                      <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                      <span className="text-xs font-medium">
+                        {uploading ? "Subiendo..." : "Subir Menú PDF"}
+                      </span>
+                    </label>
+                  </div>
+                  {formData.pdf_tarjeta_url && (
+                    <div className="flex gap-2 mt-2">
+                      <Button variant="outline" size="sm" className="flex-1" asChild>
+                        <a href={formData.pdf_tarjeta_url} target="_blank" rel="noopener noreferrer">Ver Menú</a>
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
-                {formData.pdf_tarjeta_url && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-primary" />
-                        <span className="text-sm font-medium">PDF cargado</span>
-                      </div>
-                      <Badge variant="outline" className="bg-primary/10">Activo</Badge>
-                    </div>
-                    
-                    <div className="flex justify-center p-4 bg-white rounded-lg">
-                      <QRCode value={formData.pdf_tarjeta_url} size={150} />
-                    </div>
-                    <p className="text-sm text-center text-muted-foreground">
-                      Escanea para descargar el PDF
-                    </p>
-
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="flex-1"
-                        onClick={() => copyToClipboard(formData.pdf_tarjeta_url || "")}
-                      >
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copiar enlace
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="flex-1"
-                        asChild
-                      >
-                        <a href={formData.pdf_tarjeta_url} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          Ver PDF
-                        </a>
-                      </Button>
-                    </div>
+                {/* QR Image Upload */}
+                <div className="space-y-2">
+                  <Label>Imagen Código QR</Label>
+                  <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleUpload(e, 'qr')}
+                      className="hidden"
+                      id="qr-upload"
+                      disabled={uploading}
+                    />
+                    <label htmlFor="qr-upload" className="cursor-pointer flex flex-col items-center">
+                      <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                      <span className="text-xs font-medium">
+                        {uploading ? "Subiendo..." : "Subir Imagen QR"}
+                      </span>
+                    </label>
                   </div>
-                )}
+                  {formData.logo_url && (
+                    <div className="mt-2">
+                      <img src={formData.logo_url} alt="QR" className="h-20 w-20 mx-auto object-contain" />
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>

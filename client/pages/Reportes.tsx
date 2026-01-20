@@ -5,6 +5,8 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { jsPDF } from "jspdf";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -14,7 +16,8 @@ import {
   Package,
   Calendar,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  FileDown
 } from "lucide-react";
 import {
   LineChart,
@@ -127,6 +130,17 @@ export default function Reportes() {
     );
   }
 
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.text("Reporte Mensual Caiman POS", 10, 10);
+    doc.setFontSize(12);
+    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 10, 20);
+    doc.text(`Ingresos Totales: $${salesSummary?.totalGeneral.toFixed(2)}`, 10, 30);
+    doc.text(`Ventas Realizadas: ${salesSummary?.totalVentas}`, 10, 40);
+    doc.save("reporte-mensual.pdf");
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -138,10 +152,16 @@ export default function Reportes() {
               {isAdmin ? 'Vista global de todos los puntos de venta' : 'Reportes de tu punto de venta'}
             </p>
           </div>
-          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-            <Calendar className="h-4 w-4 mr-2" />
-            Última semana
-          </Badge>
+          <div className="flex gap-2">
+            <Button onClick={exportToPDF} variant="outline" className="gap-2">
+              <FileDown className="h-4 w-4" />
+              Exportar PDF
+            </Button>
+            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+              <Calendar className="h-4 w-4 mr-2" />
+              Última semana
+            </Badge>
+          </div>
         </div>
 
         {/* Stats Cards */}
