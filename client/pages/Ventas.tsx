@@ -12,6 +12,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ExtrasModal, Extra } from "@/components/pos/ExtrasModal";
 import { AssignmentSelector } from "@/components/pos/AssignmentSelector";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ShoppingCart, 
   Plus, 
   Minus, 
@@ -20,7 +27,8 @@ import {
   Banknote,
   Search,
   Package,
-  Settings
+  Settings,
+  User as UserIcon
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -46,7 +54,7 @@ export default function Ventas() {
   const [cart, setCart] = useState<CartItem[]>([]);
   
   // Assignment state
-  const [assignmentType, setAssignmentType] = useState<'none' | 'mesa' | 'cliente'>('none');
+  const [assignmentType, setAssignmentType] = useState<'none' | 'mesa' | 'cliente' | 'para_llevar' | 'externa'>('none');
   const [assignmentId, setAssignmentId] = useState<string | null>(null);
   
   // Extras modal state
@@ -156,44 +164,32 @@ export default function Ventas() {
         .insert(ventaItems);
       if (itemsError) throw itemsError;
 
-      // Deduct stock
-      for (const item of cart) {
-        // Check if product has receta
-        const { data: recetas } = await supabase
-          .from("recetas")
-          .select("insumo_id, cantidad")
-          .eq("producto_final_id", item.id);
+      // Deduct stock via recipes or direct product
+      const recipeResponse = await fetch(`/api/recetas?productoFinalId=${item.id}`);
+      const recetas = await recipeResponse.json();
 
-        if (recetas && recetas.length > 0) {
-          // Deduct insumos based on receta
-          for (const receta of recetas) {
-            const cantidadDescontar = receta.cantidad * item.cantidad;
-            const { data: insumo } = await supabase
-              .from("inventario")
-              .select("stock")
-              .eq("id", receta.insumo_id)
-              .single();
-            if (insumo) {
-              await supabase
-                .from("inventario")
-                .update({ stock: Math.max(0, insumo.stock - cantidadDescontar) })
-                .eq("id", receta.insumo_id);
-            }
+      if (recetas && recetas.length > 0) {
+        for (const receta of recetas) {
+          const cantidadDescontar = receta.cantidad * item.cantidad;
+          const insumoResponse = await fetch(`/api/inventario/${receta.insumoId}`);
+          const insumo = await insumoResponse.json();
+          if (insumo) {
+            await fetch(`/api/inventario/${receta.insumoId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ stock: Math.max(0, insumo.stock - cantidadDescontar) })
+            });
           }
-        } else {
-          // Deduct the product itself
-          const { data: producto } = await supabase
-            .from("inventario")
-            .select("stock")
-            .eq("id", item.id)
-            .single();
-          
-          if (producto) {
-            await supabase
-              .from("inventario")
-              .update({ stock: Math.max(0, producto.stock - item.cantidad) })
-              .eq("id", item.id);
-          }
+        }
+      } else {
+        const prodResponse = await fetch(`/api/inventario/${item.id}`);
+        const producto = await prodResponse.json();
+        if (producto) {
+          await fetch(`/api/inventario/${item.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stock: Math.max(0, producto.stock - item.cantidad) })
+          });
         }
       }
 
@@ -241,6 +237,16 @@ export default function Ventas() {
     );
   }
 
+  const { data: clientesData = [] } = useQuery({
+    queryKey: ['clientes-pos', storeId],
+    queryFn: async () => {
+      if (!storeId) return [];
+      const response = await fetch(`/api/clientes?puntoVentaId=${storeId}`);
+      return response.json();
+    },
+    enabled: !!storeId,
+  });
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -254,10 +260,23 @@ export default function Ventas() {
               {role === 'administrador' && 'Vista completa del punto de venta'}
             </p>
           </div>
-          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-            <ShoppingCart className="h-4 w-4 mr-2" />
-            {cart.length} items
-          </Badge>
+          <div className="flex gap-4 items-center">
+            <Select value={assignmentType} onValueChange={(v: any) => setAssignmentType(v)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Tipo de Venta" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="para_llevar">Para Llevar</SelectItem>
+                <SelectItem value="externa">Venta Externa</SelectItem>
+                <SelectItem value="mesa">Mesa</SelectItem>
+                <SelectItem value="cliente">Cliente</SelectItem>
+              </SelectContent>
+            </Select>
+            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              {cart.length} items
+            </Badge>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -324,14 +343,32 @@ export default function Ventas() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
+              {/* Client search if type is cliente */}
+              {assignmentType === 'cliente' && (
+                <div className="space-y-2">
+                  <Label>Seleccionar Cliente</Label>
+                  <Select value={assignmentId || ""} onValueChange={setAssignmentId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Buscar cliente..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clientesData.map((c: any) => (
+                        <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               {/* Assignment Selector */}
-              <AssignmentSelector
-                storeId={storeId}
-                assignmentType={assignmentType}
-                assignmentId={assignmentId}
-                onTypeChange={setAssignmentType}
-                onIdChange={setAssignmentId}
-              />
+              {assignmentType === 'mesa' && (
+                <AssignmentSelector
+                  storeId={storeId}
+                  assignmentType={assignmentType}
+                  assignmentId={assignmentId}
+                  onTypeChange={setAssignmentType}
+                  onIdChange={setAssignmentId}
+                />
+              )}
 
               {cart.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">

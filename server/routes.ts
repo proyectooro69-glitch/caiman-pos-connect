@@ -551,4 +551,53 @@ export function registerRoutes(app: Express) {
       res.status(400).json({ error: error.message });
     }
   });
+
+  // Global Settings Routes
+  app.get("/api/settings/:puntoVentaId", async (req, res) => {
+    try {
+      const settings = await storage.getGlobalSettings(req.params.puntoVentaId);
+      res.json(settings || null);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/settings", async (req, res) => {
+    try {
+      const parsed = schema.insertGlobalSettingsSchema.parse(req.body);
+      const settings = await storage.createGlobalSettings(parsed);
+      res.status(201).json(settings);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/settings/:puntoVentaId", async (req, res) => {
+    try {
+      const settings = await storage.updateGlobalSettings(req.params.puntoVentaId, req.body);
+      res.json(settings);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Caja Routes
+  app.get("/api/caja/:puntoVentaId", async (req, res) => {
+    try {
+      const movimientos = await storage.getMovimientosCaja(req.params.puntoVentaId);
+      res.json(movimientos);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/caja", async (req, res) => {
+    try {
+      const parsed = schema.insertMovimientosCajaSchema.parse(req.body);
+      const movimiento = await storage.createMovimientoCaja(parsed);
+      res.status(201).json(movimiento);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
 }

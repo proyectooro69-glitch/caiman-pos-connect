@@ -51,6 +51,7 @@ export function AppSidebar() {
         icon: ShoppingCart, 
         items: [
           { title: "POS", url: "/ventas", roles: ['administrador', 'supervisor', 'vendedor'] },
+          { title: "Caja", url: "/caja", roles: ['administrador', 'vendedor'] },
           { title: "Mesas", url: "/mesas", roles: ['administrador', 'supervisor', 'vendedor'] },
           { title: "Clientes", url: "/clientes", roles: ['administrador', 'supervisor', 'vendedor'] },
           { title: "Venta Externa", url: "/venta-externa", roles: ['administrador', 'supervisor', 'vendedor'] },

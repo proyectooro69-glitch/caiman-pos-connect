@@ -69,6 +69,11 @@ export interface IStorage {
   updateConfiguracionTienda(puntoVentaId: string, data: Partial<schema.InsertConfiguracionTienda>): Promise<schema.ConfiguracionTienda | undefined>;
   
   getExpiringSubscriptions(targetDate: string): Promise<schema.PuntoVenta[]>;
+  getGlobalSettings(puntoVentaId: string): Promise<schema.GlobalSettings | undefined>;
+  createGlobalSettings(data: schema.InsertGlobalSettings): Promise<schema.GlobalSettings>;
+  updateGlobalSettings(puntoVentaId: string, data: Partial<schema.InsertGlobalSettings>): Promise<schema.GlobalSettings | undefined>;
+  getMovimientosCaja(puntoVentaId: string): Promise<schema.MovimientoCaja[]>;
+  createMovimientoCaja(data: schema.InsertMovimientoCaja): Promise<schema.MovimientoCaja>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -316,6 +321,30 @@ export class DatabaseStorage implements IStorage {
 
   async getExpiringSubscriptions(targetDate: string): Promise<schema.PuntoVenta[]> {
     return db.select().from(schema.puntosVenta).where(eq(schema.puntosVenta.fechaVencimiento, targetDate));
+  }
+
+  async getGlobalSettings(puntoVentaId: string): Promise<schema.GlobalSettings | undefined> {
+    const [result] = await db.select().from(schema.globalSettings).where(eq(schema.globalSettings.puntoVentaId, puntoVentaId));
+    return result;
+  }
+
+  async createGlobalSettings(data: schema.InsertGlobalSettings): Promise<schema.GlobalSettings> {
+    const [result] = await db.insert(schema.globalSettings).values(data).returning();
+    return result;
+  }
+
+  async updateGlobalSettings(puntoVentaId: string, data: Partial<schema.InsertGlobalSettings>): Promise<schema.GlobalSettings | undefined> {
+    const [result] = await db.update(schema.globalSettings).set(data).where(eq(schema.globalSettings.puntoVentaId, puntoVentaId)).returning();
+    return result;
+  }
+
+  async getMovimientosCaja(puntoVentaId: string): Promise<schema.MovimientoCaja[]> {
+    return db.select().from(schema.movimientosCaja).where(eq(schema.movimientosCaja.puntoVentaId, puntoVentaId));
+  }
+
+  async createMovimientoCaja(data: schema.InsertMovimientoCaja): Promise<schema.MovimientoCaja> {
+    const [result] = await db.insert(schema.movimientosCaja).values(data).returning();
+    return result;
   }
 }
 

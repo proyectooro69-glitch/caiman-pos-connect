@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import QRCode from "@/components/QRCode";
 import { 
@@ -22,108 +24,101 @@ import {
   Clock,
   ExternalLink,
   Copy,
-  Link2
+  Link2,
+  Globe,
+  Receipt,
+  CreditCard as PaymentIcon,
+  Mail
 } from "lucide-react";
 
-interface StoreConfig {
+interface GlobalSettings {
   id?: string;
-  punto_venta_id: string;
-  nombre_negocio: string;
-  whatsapp: string;
+  puntoVentaId: string;
+  nombreNegocio: string;
+  logoUrl: string;
   direccion: string;
-  pdf_tarjeta_url: string;
-  logo_url: string;
-  descripcion: string;
-  horario: string;
+  telefono: string;
+  correo: string;
+  moneda: string;
+  zonaHoraria: string;
+  porcentajeIva: string;
+  mensajeLegal: string;
+  stripeKey: string;
+  paypalEmail: string;
 }
 
 export default function AdminSettings() {
   const { storeId, loading: roleLoading, isAdmin, isSupervisor } = useUserRole();
   const queryClient = useQueryClient();
   
-  const [formData, setFormData] = useState<Partial<StoreConfig>>({
-    nombre_negocio: "",
-    whatsapp: "",
+  const [formData, setFormData] = useState<Partial<GlobalSettings>>({
+    nombreNegocio: "",
+    logoUrl: "",
     direccion: "",
-    pdf_tarjeta_url: "",
-    logo_url: "",
-    descripcion: "",
-    horario: "",
+    telefono: "",
+    correo: "",
+    moneda: "USD",
+    zonaHoraria: "UTC",
+    porcentajeIva: "16.00",
+    mensajeLegal: "",
+    stripeKey: "",
+    paypalEmail: "",
   });
   const [uploading, setUploading] = useState(false);
 
-  // Fetch existing config via proxy
-  const { data: config, isLoading: configLoading } = useQuery({
-    queryKey: ["store-config", storeId],
+  // Fetch existing global settings via proxy
+  const { data: settings, isLoading: settingsLoading } = useQuery({
+    queryKey: ["global-settings", storeId],
     queryFn: async () => {
       if (!storeId) return null;
-      const response = await fetch(`/api/proxy/config/${storeId}`);
-      if (!response.ok) throw new Error('Failed to fetch config');
+      const response = await fetch(`/api/settings/${storeId}`);
+      if (!response.ok) throw new Error('Failed to fetch settings');
       return response.json();
     },
     enabled: !roleLoading && !!storeId,
   });
 
-  // Populate form when config loads
+  // Populate form when settings load
   useEffect(() => {
-    if (config) {
-      setFormData({
-        nombre_negocio: config.nombre_negocio || "",
-        whatsapp: config.whatsapp || "",
-        direccion: config.direccion || "",
-        pdf_tarjeta_url: config.pdf_tarjeta_url || "",
-        logo_url: config.logo_url || "",
-        descripcion: config.descripcion || "",
-        horario: config.horario || "",
-      });
+    if (settings) {
+      setFormData(settings);
     }
-  }, [config]);
+  }, [settings]);
 
-  // Save config mutation
+  // Save settings mutation
   const saveMutation = useMutation({
-    mutationFn: async (data: Partial<StoreConfig>) => {
+    mutationFn: async (data: Partial<GlobalSettings>) => {
       if (!storeId) throw new Error("No store ID");
       
-      const method = config?.id ? "PATCH" : "POST";
-      const url = config?.id 
-        ? `/api/configuracion-tienda/${storeId}`
-        : `/api/configuracion-tienda`;
+      const method = settings?.id ? "PATCH" : "POST";
+      const url = settings?.id 
+        ? `/api/settings/${storeId}`
+        : `/api/settings`;
 
       const response = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          punto_venta_id: storeId,
-        }),
+        body: JSON.stringify({ ...data, puntoVentaId: storeId }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to save configuration");
+        throw new Error(error.error || "Failed to save settings");
       }
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["store-config"] });
-      toast.success("Configuración guardada");
+      queryClient.invalidateQueries({ queryKey: ["global-settings"] });
+      toast.success("Configuración global guardada");
     },
     onError: (error) => {
       toast.error("Error al guardar: " + error.message);
     },
   });
 
-  // Upload PDF/Image handler
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'pdf' | 'qr') => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'qr') => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    
-    if (type === 'pdf' && file.type !== "application/pdf") {
-      toast.error("Solo se permiten archivos PDF");
-      return;
-    }
-    
-    if (type === 'qr' && !file.type.startsWith('image/')) {
+    if (!file || !file.type.startsWith('image/')) {
       toast.error("Solo se permiten imágenes");
       return;
     }
@@ -132,26 +127,15 @@ export default function AdminSettings() {
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${storeId}-${type}-${Date.now()}.${fileExt}`;
-      
       const { error: uploadError } = await supabase.storage
         .from("tarjetas-digitales")
         .upload(fileName, file, { upsert: true });
-      
       if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from("tarjetas-digitales")
-        .getPublicUrl(fileName);
-
-      if (type === 'pdf') {
-        setFormData(prev => ({ ...prev, pdf_tarjeta_url: publicUrl }));
-        toast.success("Menú PDF subido correctamente");
-      } else {
-        setFormData(prev => ({ ...prev, logo_url: publicUrl }));
-        toast.success("Imagen de QR subida correctamente");
-      }
+      const { data: { publicUrl } } = supabase.storage.from("tarjetas-digitales").getPublicUrl(fileName);
+      setFormData(prev => ({ ...prev, logoUrl: publicUrl }));
+      toast.success("Logo subido correctamente");
     } catch (error: any) {
-      toast.error("Error al subir archivo: " + error.message);
+      toast.error("Error al subir: " + error.message);
     } finally {
       setUploading(false);
     }
@@ -162,252 +146,135 @@ export default function AdminSettings() {
     saveMutation.mutate(formData);
   };
 
-  const catalogUrl = storeId 
-    ? `${window.location.origin}/catalogo/${storeId}` 
-    : "";
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success("Copiado al portapapeles");
-  };
-
-  if (roleLoading || configLoading) {
-    return (
-      <AppLayout>
-        <div className="space-y-6 p-6">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-96 w-full" />
-        </div>
-      </AppLayout>
-    );
-  }
-
-  if (!isAdmin && !isSupervisor) {
-    return (
-      <AppLayout>
-        <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-          <Settings className="h-16 w-16 text-muted-foreground mb-4" />
-          <h2 className="text-2xl font-bold text-foreground">Acceso Restringido</h2>
-          <p className="text-muted-foreground mt-2">
-            Solo administradores pueden acceder a la configuración.
-          </p>
-        </div>
-      </AppLayout>
-    );
+  if (roleLoading || settingsLoading) {
+    return <AppLayout><div className="p-6"><Skeleton className="h-96 w-full" /></div></AppLayout>;
   }
 
   return (
     <AppLayout>
       <div className="space-y-6 p-6">
-        {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Configuración</h1>
-          <p className="text-muted-foreground">
-            Administra los datos de tu negocio y enlaces públicos
-          </p>
+          <h1 className="text-3xl font-bold text-foreground">Configuración Global</h1>
+          <p className="text-muted-foreground">Gestiona todos los parámetros de tu POS</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Business Info Form */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Store className="h-5 w-5" />
-                Datos del Negocio
-              </CardTitle>
-              <CardDescription>
-                Información que aparecerá en tu catálogo público
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="nombre_negocio">Nombre del Negocio</Label>
-                  <Input
-                    id="nombre_negocio"
-                    value={formData.nombre_negocio}
-                    onChange={(e) => setFormData({ ...formData, nombre_negocio: e.target.value })}
-                    placeholder="Mi Restaurante"
-                  />
-                </div>
+        <form onSubmit={handleSubmit}>
+          <Tabs defaultValue="negocio" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-4 lg:max-w-2xl">
+              <TabsTrigger value="negocio" className="gap-2"><Store className="h-4 w-4"/> Negocio</TabsTrigger>
+              <TabsTrigger value="localizacion" className="gap-2"><Globe className="h-4 w-4"/> Localización</TabsTrigger>
+              <TabsTrigger value="facturacion" className="gap-2"><Receipt className="h-4 w-4"/> Facturación</TabsTrigger>
+              <TabsTrigger value="pagos" className="gap-2"><PaymentIcon className="h-4 w-4"/> Pagos</TabsTrigger>
+            </TabsList>
 
-                <div className="space-y-2">
-                  <Label htmlFor="descripcion">Descripción</Label>
-                  <Textarea
-                    id="descripcion"
-                    value={formData.descripcion}
-                    onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                    placeholder="Breve descripción de tu negocio..."
-                    rows={3}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="whatsapp" className="flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      WhatsApp
-                    </Label>
-                    <Input
-                      id="whatsapp"
-                      value={formData.whatsapp}
-                      onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
-                      placeholder="+52 555 123 4567"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="horario" className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Horario
-                    </Label>
-                    <Input
-                      id="horario"
-                      value={formData.horario}
-                      onChange={(e) => setFormData({ ...formData, horario: e.target.value })}
-                      placeholder="Lun-Vie 9am-9pm"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="direccion" className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    Dirección
-                  </Label>
-                  <Input
-                    id="direccion"
-                    value={formData.direccion}
-                    onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
-                    placeholder="Calle, Número, Colonia, Ciudad"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="logo_url">URL del Logo</Label>
-                  <Input
-                    id="logo_url"
-                    value={formData.logo_url}
-                    onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
-                    placeholder="https://..."
-                  />
-                </div>
-
-                <Button 
-                  type="submit" 
-                  className="w-full"
-                  disabled={saveMutation.isPending}
-                >
-                  {saveMutation.isPending ? "Guardando..." : "Guardar Configuración"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* Catalog & PDF Section */}
-          <div className="space-y-6">
-            {/* Catalog Link */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Link2 className="h-5 w-5" />
-                  Vitrina Online
-                </CardTitle>
-                <CardDescription>
-                  Comparte este enlace para que tus clientes vean tu catálogo
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Input value={catalogUrl} readOnly className="font-mono text-sm" />
-                  <Button variant="outline" size="icon" onClick={() => copyToClipboard(catalogUrl)}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon" asChild>
-                    <a href={catalogUrl} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  </Button>
-                </div>
-
-                <div className="flex justify-center p-4 bg-white rounded-lg">
-                  <QRCode value={catalogUrl} size={150} />
-                </div>
-                <p className="text-sm text-center text-muted-foreground">
-                  Escanea para ver el catálogo
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* PDF & QR Upload */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Archivos del Negocio
-                </CardTitle>
-                <CardDescription>
-                  Sube tu menú en PDF y la imagen de tu código QR
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* PDF Upload */}
-                <div className="space-y-2">
-                  <Label>Menú Digital (PDF)</Label>
-                  <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      onChange={(e) => handleUpload(e, 'pdf')}
-                      className="hidden"
-                      id="pdf-upload"
-                      disabled={uploading}
-                    />
-                    <label htmlFor="pdf-upload" className="cursor-pointer flex flex-col items-center">
-                      <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                      <span className="text-xs font-medium">
-                        {uploading ? "Subiendo..." : "Subir Menú PDF"}
-                      </span>
-                    </label>
-                  </div>
-                  {formData.pdf_tarjeta_url && (
-                    <div className="flex gap-2 mt-2">
-                      <Button variant="outline" size="sm" className="flex-1" asChild>
-                        <a href={formData.pdf_tarjeta_url} target="_blank" rel="noopener noreferrer">Ver Menú</a>
-                      </Button>
+            <TabsContent value="negocio">
+              <Card>
+                <CardHeader><CardTitle>Datos del Negocio</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Nombre del Negocio</Label>
+                      <Input value={formData.nombreNegocio} onChange={e => setFormData({...formData, nombreNegocio: e.target.value})} />
                     </div>
-                  )}
-                </div>
-
-                {/* QR Image Upload */}
-                <div className="space-y-2">
-                  <Label>Imagen Código QR</Label>
-                  <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleUpload(e, 'qr')}
-                      className="hidden"
-                      id="qr-upload"
-                      disabled={uploading}
-                    />
-                    <label htmlFor="qr-upload" className="cursor-pointer flex flex-col items-center">
-                      <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                      <span className="text-xs font-medium">
-                        {uploading ? "Subiendo..." : "Subir Imagen QR"}
-                      </span>
-                    </label>
-                  </div>
-                  {formData.logo_url && (
-                    <div className="mt-2">
-                      <img src={formData.logo_url} alt="QR" className="h-20 w-20 mx-auto object-contain" />
+                    <div className="space-y-2">
+                      <Label>Correo de Contacto</Label>
+                      <Input type="email" value={formData.correo} onChange={e => setFormData({...formData, correo: e.target.value})} />
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Teléfono</Label>
+                      <Input value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Dirección</Label>
+                      <Input value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})} />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Logo</Label>
+                    <div className="flex items-center gap-4">
+                      {formData.logoUrl && <img src={formData.logoUrl} className="h-12 w-12 rounded object-cover" />}
+                      <Input type="file" accept="image/*" onChange={e => handleUpload(e, 'logo')} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="localizacion">
+              <Card>
+                <CardHeader><CardTitle>Moneda y Horario</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Moneda Principal</Label>
+                      <Select value={formData.moneda} onValueChange={v => setFormData({...formData, moneda: v})}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">Dólar (USD)</SelectItem>
+                          <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                          <SelectItem value="PYG">Guaraní (PYG)</SelectItem>
+                          <SelectItem value="CUP">Peso Cubano (CUP)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Zona Horaria</Label>
+                      <Select value={formData.zonaHoraria} onValueChange={v => setFormData({...formData, zonaHoraria: v})}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="UTC">UTC</SelectItem>
+                          <SelectItem value="America/Mexico_City">Mexico City</SelectItem>
+                          <SelectItem value="America/Asuncion">Asunción</SelectItem>
+                          <SelectItem value="America/Havana">Havana</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="facturacion">
+              <Card>
+                <CardHeader><CardTitle>Parámetros Fiscales</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2 w-1/2">
+                    <Label>% de IVA</Label>
+                    <Input type="number" step="0.01" value={formData.porcentajeIva} onChange={e => setFormData({...formData, porcentajeIva: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Mensaje Legal en Recibos</Label>
+                    <Textarea rows={4} value={formData.mensajeLegal} onChange={e => setFormData({...formData, mensajeLegal: e.target.value})} placeholder="Gracias por su compra..." />
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="pagos">
+              <Card>
+                <CardHeader><CardTitle>Pasarelas de Pago</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Stripe Public Key</Label>
+                    <Input placeholder="pk_test_..." value={formData.stripeKey} onChange={e => setFormData({...formData, stripeKey: e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>PayPal Business Email</Label>
+                    <Input type="email" placeholder="email@negocio.com" value={formData.paypalEmail} onChange={e => setFormData({...formData, paypalEmail: e.target.value})} />
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          <div className="mt-6">
+            <Button type="submit" className="w-full lg:w-auto px-12" disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? "Guardando..." : "Guardar Todos los Cambios"}
+            </Button>
           </div>
-        </div>
+        </form>
       </div>
     </AppLayout>
   );

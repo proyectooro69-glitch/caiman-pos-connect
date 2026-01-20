@@ -161,7 +161,40 @@ export const configuracionTienda = pgTable("configuracion_tienda", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const insertPuntoVentaSchema = createInsertSchema(puntosVenta).omit({ id: true, createdAt: true, updatedAt: true });
+export const globalSettings = pgTable("global_settings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  puntoVentaId: uuid("punto_venta_id").notNull().references(() => puntosVenta.id).unique(),
+  nombreNegocio: text("nombre_negocio").notNull(),
+  logoUrl: text("logo_url"),
+  direccion: text("direccion"),
+  telefono: text("telefono"),
+  correo: text("correo"),
+  moneda: text("moneda").default("USD"),
+  zonaHoraria: text("zona_horaria").default("UTC"),
+  porcentajeIva: numeric("porcentaje_iva", { precision: 5, scale: 2 }).default("16.00"),
+  mensajeLegal: text("mensaje_legal"),
+  stripeKey: text("stripe_key"),
+  paypalEmail: text("paypal_email"),
+});
+
+export const movimientosCaja = pgTable("movimientos_caja", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull(),
+  puntoVentaId: uuid("punto_venta_id").notNull().references(() => puntosVenta.id),
+  tipo: text("tipo").notNull(), // apertura, cierre, entrada, salida
+  monto: numeric("monto", { precision: 12, scale: 2 }).notNull(),
+  fecha: timestamp("fecha", { withTimezone: true }).defaultNow(),
+  observaciones: text("observaciones"),
+  diferencia: numeric("diferencia", { precision: 12, scale: 2 }),
+});
+
+export const insertGlobalSettingsSchema = createInsertSchema(globalSettings).omit({ id: true });
+export const insertMovimientosCajaSchema = createInsertSchema(movimientosCaja).omit({ id: true });
+
+export type GlobalSettings = typeof globalSettings.$inferSelect;
+export type InsertGlobalSettings = z.infer<typeof insertGlobalSettingsSchema>;
+export type MovimientoCaja = typeof movimientosCaja.$inferSelect;
+export type InsertMovimientoCaja = z.infer<typeof insertMovimientosCajaSchema>;
 export const insertProfileSchema = createInsertSchema(profiles).omit({ createdAt: true, updatedAt: true });
 export const insertUserRoleSchema = createInsertSchema(userRoles).omit({ id: true, createdAt: true });
 export const insertInventarioSchema = createInsertSchema(inventario).omit({ id: true, createdAt: true, updatedAt: true });
