@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import path from "path";
+import fs from "fs";
 import cors from "cors";
 import cron from "node-cron";
 import { registerRoutes } from "./routes";
@@ -107,13 +108,16 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   }
 
   // SPA Catch-all route for production
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-      res.sendFile(path.resolve(__dirname, '../dist/public/index.html'));
+  app.get(/^(?!\/api).*/, (req, res) => {
+    const indexPath = path.resolve(__dirname, "..", "dist", "public", "index.html");
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send("Not Found");
     }
   });
 
-  const port = process.env.PORT || 10000;
+  const port = process.env.PORT || 5000;
   server.listen(Number(port), "0.0.0.0", () => {
     log(`serving on port ${port}`);
   });
