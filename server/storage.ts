@@ -333,9 +333,16 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async updateGlobalSettings(puntoVentaId: string, data: Partial<schema.InsertGlobalSettings>): Promise<schema.GlobalSettings | undefined> {
-    const [result] = await db.update(schema.globalSettings).set(data).where(eq(schema.globalSettings.puntoVentaId, puntoVentaId)).returning();
-    return result;
+  async updateGlobalSettings(puntoVentaId: string, settings: Partial<schema.GlobalSettings>): Promise<schema.GlobalSettings | undefined> {
+    const [updated] = await db.update(schema.globalSettings)
+      .set({
+        ...settings,
+        stripeSecretKey: settings.stripeSecretKey === "********" ? undefined : settings.stripeSecretKey,
+        updatedAt: new Date()
+      })
+      .where(eq(schema.globalSettings.puntoVentaId, puntoVentaId))
+      .returning();
+    return updated;
   }
 
   async getMovimientosCaja(puntoVentaId: string): Promise<schema.MovimientoCaja[]> {

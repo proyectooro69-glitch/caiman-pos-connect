@@ -574,7 +574,23 @@ export function registerRoutes(app: Express) {
 
   app.patch("/api/settings/:puntoVentaId", async (req, res) => {
     try {
-      const settings = await storage.updateGlobalSettings(req.params.puntoVentaId, req.body);
+      const { 
+        nombreNegocio, logoUrl, direccion, telefono, correo, moneda, 
+        zonaHoraria, porcentajeIva, mensajeLegal,
+        stripePublicKey, stripeSecretKey, paypalClientId,
+        transfermovilPhone, transfermovilCardCup, walletAddressUsdt,
+        cryptoNetwork, currencyCode
+      } = req.body;
+
+      const settings = await storage.updateGlobalSettings(req.params.puntoVentaId, {
+        nombreNegocio, logoUrl, direccion, telefono, correo, moneda, 
+        zonaHoraria, porcentajeIva, mensajeLegal,
+        stripePublicKey, 
+        stripeSecretKey: stripeSecretKey === "********" ? undefined : stripeSecretKey,
+        paypalClientId,
+        transfermovilPhone, transfermovilCardCup, walletAddressUsdt,
+        cryptoNetwork, currencyCode
+      });
       res.json(settings);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
