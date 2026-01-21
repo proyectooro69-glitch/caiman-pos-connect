@@ -10,7 +10,7 @@ import { sendSubscriptionEmail, checkExpiringSubscriptions } from "./email";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(path.dirname(__filename));
 
 const app = express();
 app.use(cors());
@@ -109,8 +109,9 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
   // SPA Catch-all route for production
   app.get(/^(?!\/api).*/, (req, res) => {
-    const indexPath = path.resolve(__dirname, "..", "dist", "public", "index.html");
+    const indexPath = path.resolve(__dirname, "dist", "public", "index.html");
     if (fs.existsSync(indexPath)) {
+      res.setHeader("Cache-Control", "no-cache");
       res.sendFile(indexPath);
     } else {
       res.status(404).send("Not Found");
