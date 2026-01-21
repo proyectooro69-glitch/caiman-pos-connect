@@ -43,8 +43,14 @@ interface GlobalSettings {
   zonaHoraria: string;
   porcentajeIva: string;
   mensajeLegal: string;
-  stripeKey: string;
-  paypalEmail: string;
+  stripePublicKey: string;
+  stripeSecretKey: string;
+  paypalClientId: string;
+  transfermovilPhone: string;
+  transfermovilCardCup: string;
+  walletAddressUsdt: string;
+  cryptoNetwork: string;
+  currencyCode: string;
 }
 
 export default function AdminSettings() {
@@ -61,8 +67,14 @@ export default function AdminSettings() {
     zonaHoraria: "UTC",
     porcentajeIva: "16.00",
     mensajeLegal: "",
-    stripeKey: "",
-    paypalEmail: "",
+    stripePublicKey: "",
+    stripeSecretKey: "",
+    paypalClientId: "",
+    transfermovilPhone: "",
+    transfermovilCardCup: "",
+    walletAddressUsdt: "",
+    cryptoNetwork: "",
+    currencyCode: "USD",
   });
   const [uploading, setUploading] = useState(false);
 
@@ -164,7 +176,7 @@ export default function AdminSettings() {
               <TabsTrigger value="negocio" className="gap-2"><Store className="h-4 w-4"/> Negocio</TabsTrigger>
               <TabsTrigger value="localizacion" className="gap-2"><Globe className="h-4 w-4"/> Localización</TabsTrigger>
               <TabsTrigger value="facturacion" className="gap-2"><Receipt className="h-4 w-4"/> Facturación</TabsTrigger>
-              <TabsTrigger value="pagos" className="gap-2"><PaymentIcon className="h-4 w-4"/> Pagos</TabsTrigger>
+              <TabsTrigger value="pagos" className="gap-2"><PaymentIcon className="h-4 w-4"/> Pagos y Moneda</TabsTrigger>
             </TabsList>
 
             <TabsContent value="negocio">
@@ -254,15 +266,76 @@ export default function AdminSettings() {
 
             <TabsContent value="pagos">
               <Card>
-                <CardHeader><CardTitle>Pasarelas de Pago</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Stripe Public Key</Label>
-                    <Input placeholder="pk_test_..." value={formData.stripeKey} onChange={e => setFormData({...formData, stripeKey: e.target.value})} />
+                <CardHeader><CardTitle>Pasarelas de Pago y Moneda Regional</CardTitle></CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Moneda de Transacción (Código)</Label>
+                      <Select value={formData.currencyCode} onValueChange={v => setFormData({...formData, currencyCode: v})}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">Dólar (USD)</SelectItem>
+                          <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                          <SelectItem value="PYG">Guaraní (PYG)</SelectItem>
+                          <SelectItem value="CUP">Peso Cubano (CUP)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">PYG aplicará formato sin decimales y separador de miles.</p>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>PayPal Business Email</Label>
-                    <Input type="email" placeholder="email@negocio.com" value={formData.paypalEmail} onChange={e => setFormData({...formData, paypalEmail: e.target.value})} />
+
+                  <div className="border-t pt-4">
+                    <h3 className="font-semibold mb-3">Pasarelas Digitales</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Stripe Public Key</Label>
+                        <Input value={formData.stripePublicKey} onChange={e => setFormData({...formData, stripePublicKey: e.target.value})} placeholder="pk_live_..." />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Stripe Secret Key</Label>
+                        <Input type="password" value={formData.stripeSecretKey ? "********" : ""} onChange={e => setFormData({...formData, stripeSecretKey: e.target.value})} placeholder="sk_live_..." />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>PayPal Client ID</Label>
+                        <Input value={formData.paypalClientId} onChange={e => setFormData({...formData, paypalClientId: e.target.value})} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <h3 className="font-semibold mb-3">Transferencia Local (CUP)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Teléfono Transfermóvil</Label>
+                        <Input value={formData.transfermovilPhone} onChange={e => setFormData({...formData, transfermovilPhone: e.target.value})} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Tarjeta CUP</Label>
+                        <Input value={formData.transfermovilCardCup} onChange={e => setFormData({...formData, transfermovilCardCup: e.target.value})} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <h3 className="font-semibold mb-3">Criptomonedas (USDT)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Billetera USDT Address</Label>
+                        <Input value={formData.walletAddressUsdt} onChange={e => setFormData({...formData, walletAddressUsdt: e.target.value})} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Red (Network)</Label>
+                        <Select value={formData.cryptoNetwork} onValueChange={v => setFormData({...formData, cryptoNetwork: v})}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="TRC20">TRON (TRC20)</SelectItem>
+                            <SelectItem value="ERC20">Ethereum (ERC20)</SelectItem>
+                            <SelectItem value="BEP20">BSC (BEP20)</SelectItem>
+                            <SelectItem value="POLYGON">Polygon</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

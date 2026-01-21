@@ -31,6 +31,22 @@ import {
   User as UserIcon
 } from "lucide-react";
 import { toast } from "sonner";
+import { useEffect } from "react";
+
+// Helper for currency formatting
+const formatCurrency = (amount: number, currency: string = "USD") => {
+  if (currency === "PYG") {
+    return new Intl.NumberFormat("es-PY", {
+      style: "currency",
+      currency: "PYG",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+  }).format(amount);
+};
 
 const supabaseUrl = 'https://mkofteflphrmdkmzcpxw.supabase.co';
 const supabaseAnonKey = 'sb_publishable_BcOFivZl7dFD_WSUUjfc4g_rZRdBDHN';
@@ -124,6 +140,23 @@ export default function Ventas() {
   const subtotal = cart.reduce((sum, item) => sum + ((item.precio + item.extrasTotal) * item.cantidad), 0);
   const impuesto = subtotal * 0.16;
   const total = subtotal + impuesto;
+
+  const { data: storeConfig } = useQuery({
+    queryKey: ["global-settings", storeId],
+    queryFn: async () => {
+      const response = await fetch(`/api/settings/${storeId}`);
+      return response.json();
+    },
+    enabled: !!storeId,
+  });
+
+  const currency = storeConfig?.currencyCode || "USD";
+
+  useEffect(() => {
+    if (storeConfig?.nombreNegocio) {
+      document.title = `${storeConfig.nombreNegocio} - POS | ${currency}`;
+    }
+  }, [storeConfig, currency]);
 
   // Process sale mutation
   const processSaleMutation = useMutation({
@@ -322,7 +355,7 @@ export default function Ventas() {
                       </div>
                       <h3 className="font-semibold text-foreground truncate">{product.nombre}</h3>
                       <div className="flex items-center justify-between mt-2">
-                        <span className="text-lg font-bold text-primary">${product.precio.toFixed(2)}</span>
+                        <span className="text-lg font-bold text-primary">{formatCurrency(product.precio, currency)}</span>
                         <Badge variant="secondary" className="text-xs">
                           Stock: {product.stock}
                         </Badge>
@@ -426,36 +459,62 @@ export default function Ventas() {
                   <div className="border-t border-border pt-4 space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Subtotal</span>
-                      <span>${subtotal.toFixed(2)}</span>
+                      <span>{formatCurrency(subtotal, currency)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">IVA (16%)</span>
-                      <span>${impuesto.toFixed(2)}</span>
+                      <span>{formatCurrency(impuesto, currency)}</span>
                     </div>
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total</span>
-                      <span className="text-primary">${total.toFixed(2)}</span>
+                      <span className="text-primary">{formatCurrency(total, currency)}</span>
                     </div>
                   </div>
 
                   {/* Payment buttons */}
-                  <div className="grid grid-cols-2 gap-3 pt-2">
-                    <Button 
-                      className="gradient-primary"
-                      onClick={() => processSale('Efectivo')}
-                      disabled={processSaleMutation.isPending}
-                    >
-                      <Banknote className="h-4 w-4 mr-2" />
-                      Efectivo
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={() => processSale('Tarjeta')}
-                      disabled={processSaleMutation.isPending}
-                    >
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      Tarjeta
-                    </Button>
+                  <div className="grid grid-cols-1 gap-3 pt-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button 
+                        className="gradient-primary"
+                        onClick={() => processSale('Efectivo')}
+                        disabled={processSaleMutation.isPending}
+                      >
+                        <Banknote className="h-4 w-4 mr-2" />
+                        Efectivo
+                      </Button>
+                      {(currency === 'USD' || currency === 'EUR') && (
+                        <Button 
+                          variant="outline"
+                          onClick={() => processSale('Digital')}
+                          disabled={processSaleMutation.isPending}
+                        >
+                          <PaymentIcon className="h-4 w-4 mr-2" />
+                          Stripe/PayPal
+                        </Button>
+                      )}
+                    </div>
+                    
+                    {currency === 'CUP' && (
+                      <Card className="bg-primary/5 border-primary/20 p-3">
+                        <p className="text-xs font-bold text-primary mb-1">Transferencia CUP:</p>
+                        <p className="text-[10px] truncate">Tel: {storeConfig?.transfermovilPhone}</p>
+                        <p className="text-[10px] truncate">Tarjeta: {storeConfig?.transfermovilCardCup}</p>
+                      </Card>
+                    )}
+
+                    {storeConfig?.walletAddressUsdt && (
+                      <Button 
+                        variant="secondary"
+                        onClick={() => {
+                          toast.info(`Billetera USDT (${storeConfig.cryptoNetwork}): ${storeConfig.walletAddressUsdt}`, {
+                            duration: 10000,
+                          });
+                        }}
+                      >
+                        <Link2 className="h-4 w-4 mr-2" />
+                        Pagar con USDT (QR/Wallet)
+                      </Button>
+                    )}
                   </div>
                 </>
               )}
