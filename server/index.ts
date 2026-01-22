@@ -59,7 +59,7 @@ app.post("/api/email/send", async (req, res) => {
   }
 });
 
-app.post("/api/email/check-expiring", async (_req, res) => {
+app.post("/api/email/check-expiring", async (req, res) => {
   try {
     const results = await checkExpiringSubscriptions();
     res.json({
@@ -132,3 +132,4 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     log(`serving on port ${port} (0.0.0.0)`);
   });
 })();
+
