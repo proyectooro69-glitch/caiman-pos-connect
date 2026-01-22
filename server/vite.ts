@@ -30,7 +30,11 @@ export async function setupVite(app: Express, server: any) {
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {
-        if (msg.includes("[TypeScript] Found 0 errors. Watching for file changes")) {
+        if (
+          msg.includes(
+            "[TypeScript] Found 0 errors. Watching for file changes"
+          )
+        ) {
           return;
         }
         viteLogger.error(msg, options);
@@ -57,7 +61,7 @@ export async function setupVite(app: Express, server: any) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(__dirname, "dist", "public");
+  const distPath = path.resolve(__dirname, "..", "dist", "public"); // ← corregido
 
   if (!fs.existsSync(distPath)) {
     console.warn(`Warning: Static directory not found at ${distPath}. Run build first for production.`);
