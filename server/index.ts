@@ -113,25 +113,24 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     if (app.get("env") === "development") {
       return res.status(404).send("Not Found (Vite should handle this)");
     }
-    
+
     const distPath = path.resolve(__dirname, "dist", "public");
     const indexPath = path.resolve(distPath, "index.html");
-    
+
     if (fs.existsSync(indexPath)) {
       res.setHeader("Cache-Control", "no-cache");
       res.sendFile(indexPath);
     } else {
-      res.status(404).json({ 
-        error: "Frontend not found", 
+      res.status(404).json({
+        error: "Frontend not found",
         message: "Make sure to run 'npm run build' first",
-        path: indexPath
+        path: indexPath,
       });
     }
   });
 
- const port = process.env.PORT ? parseInt(process.env.PORT) : 5000;
-server.listen(port, "0.0.0.0", () => {
-  log(`serving on port ${port} (0.0.0.0)`);
-});
+  const port = process.env.PORT ? parseInt(process.env.PORT) : 5000;
+  server.listen(port, "0.0.0.0", () => {
+    log(`serving on port ${port} (0.0.0.0)`);
+  });
 })();
-
