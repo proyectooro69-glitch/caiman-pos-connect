@@ -60,7 +60,8 @@ export function serveStatic(app: Express) {
   const distPath = path.resolve(__dirname, "dist", "public");
 
   if (!fs.existsSync(distPath)) {
-    throw new Error(`Could not find the build directory: ${distPath}, make sure to build the client first`);
+    console.warn(`Warning: Static directory not found at ${distPath}. Run build first for production.`);
+    return;
   }
 
   app.use(express.static(distPath, {
@@ -74,7 +75,7 @@ export function serveStatic(app: Express) {
       res.setHeader("Cache-Control", "no-cache");
       res.sendFile(indexPath);
     } else {
-      res.status(404).send("Not Found - Build directory structure mismatch");
+      res.status(404).send("Not Found - Frontend files missing");
     }
   });
 }

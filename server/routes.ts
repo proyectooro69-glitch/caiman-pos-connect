@@ -616,4 +616,8 @@ export function registerRoutes(app: Express) {
       res.status(400).json({ error: error.message });
     }
   });
+
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", message: "Server is healthy" });
+  });
 }
