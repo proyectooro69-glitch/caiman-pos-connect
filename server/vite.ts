@@ -1,85 +1,134 @@
-import express, { type Express } from "express";
-import fs from "fs";
+import express, { type Request, Response, NextFunction } from "express";
+import { createServer } from "http";
 import path from "path";
-import { createServer as createViteServer, createLogger } from "vite";
+import fs from "fs";
+import cors from "cors";
+import cron from "node-cron";
+import { registerRoutes } from "./routes";
+import { setupVite, serveStatic, log } from "./vite";
+import { sendSubscriptionEmail, checkExpiringSubscriptions } from "./email";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(path.dirname(__filename));
 
-const viteLogger = createLogger();
+const app = express();
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
+app.use((req, res, next) => {
+  const start = Date.now();
+  const path = req.path;
+  let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
+  const originalResJson = res.json;
+  res.json = function (bodyJson, ...args) {
+    capturedJsonResponse = bodyJson;
+    return originalResJson.apply(res, [bodyJson, ...args]);
+  };
 
-export async function setupVite(app: Express, server: any) {
-  const vite = await createViteServer({
-    server: {
-      middlewareMode: true,
-      hmr: { server },
-    },
-    appType: "custom",
-    customLogger: {
-      ...viteLogger,
-      error: (msg, options) => {
-        if (
-          msg.includes(
-            "[TypeScript] Found 0 errors. Watching for file changes"
-          )
-        ) {
-          return;
-        }
-        viteLogger.error(msg, options);
-      },
-    },
-  });
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    if (path.startsWith("/api")) {
+      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+      if (capturedJsonResponse) {
+        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      }
 
-  app.use(vite.middlewares);
-  app.get(/^(?!\/api).*/, async (req, res, next) => {
-    const url = req.originalUrl;
+      if (logLine.length > 80) {
+        logLine = logLine.slice(0, 79) + "…";
+      }
 
-    try {
-      const clientTemplate = path.resolve(__dirname, "..", "client", "index.html");
-
-      let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = await vite.transformIndexHtml(url, template);
-
-      res.status(200).set({ "Content-Type": "text/html" }).end(template);
-    } catch (e) {
-      vite.ssrFixStacktrace(e as Error);
-      next(e);
+      log(logLine);
     }
   });
-}
 
-export function serveStatic(app: Express) {
-  const distPath = path.resolve(__dirname, "..", "dist", "public"); // ← corregido
+  next();
+});
 
-  if (!fs.existsSync(distPath)) {
-    console.warn(`Warning: Static directory not found at ${distPath}. Run build first for production.`);
-    return;
+registerRoutes(app);
+
+app.post("/api/email/send", async (req, res) => {
+  try {
+    const result = await sendSubscriptionEmail(req.body);
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error("Error sending email:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/email/check-expiring", async (_req, res) => {
+  try {
+    const results = await checkExpiringSubscriptions();
+    res.json({
+      success: true,
+      message: `Processed ${results.length} expiring subscriptions`,
+      results,
+    });
+  } catch (error: any) {
+    console.error("Error checking expiring subscriptions:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+cron.schedule("0 9 * * *", async () => {
+  console.log("Running daily subscription check...");
+  try {
+    const results = await checkExpiringSubscriptions();
+    console.log("Subscription check complete:", results);
+  } catch (error) {
+    console.error("Error in subscription check cron:", error);
+  }
+});
+
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+  res.status(status).json({ message });
+  throw err;
+});
+
+(async () => {
+  const server = createServer(app);
+
+  app.use((req, res, next) => {
+    if (req.path.startsWith("/api")) {
+      return res.status(404).json({ message: "Not Found" });
+    }
+    next();
+  });
+
+  if (app.get("env") === "development") {
+    await setupVite(app, server);
+  } else {
+    serveStatic(app);
   }
 
-  app.use(express.static(distPath, {
-    index: "index.html",
-    maxAge: "1h"
-  }));
-
+  // SPA Catch-all route for production
   app.get(/^(?!\/api).*/, (req, res) => {
+    if (app.get("env") === "development") {
+      return res.status(404).send("Not Found (Vite should handle this)");
+    }
+
+    const distPath = path.resolve(__dirname, "..", "dist", "public");
     const indexPath = path.resolve(distPath, "index.html");
+
     if (fs.existsSync(indexPath)) {
       res.setHeader("Cache-Control", "no-cache");
       res.sendFile(indexPath);
     } else {
-      res.status(404).send("Not Found - Frontend files missing");
+      res.status(404).json({
+        error: "Frontend not found",
+        message: "Make sure to run 'npm run build' first",
+        path: indexPath,
+      });
     }
   });
-}
+
+  const port = process.env.PORT ? parseInt(process.env.PORT) : 5000;
+  server.listen(port, "0.0.0.0", () => {
+    log(`serving on port ${port} (0.0.0.0)`);
+  });
+})();
