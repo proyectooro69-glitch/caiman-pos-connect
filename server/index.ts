@@ -129,8 +129,8 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     }
   });
 
-  const port = 5000;
-  server.listen(port, "0.0.0.0", () => {
-    log(`serving on port ${port} (0.0.0.0)`);
-  });
-})();
+ const port = process.env.PORT ? parseInt(process.env.PORT) : 5000;
+server.listen(port, "0.0.0.0", () => {
+  log(`serving on port ${port} (0.0.0.0)`);
+});
+
