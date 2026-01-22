@@ -1,0 +1,41 @@
+IA, antes de comenzar, actualiza la VITE_SUPABASE_ANON_KEY en los Secrets. La llave correcta es: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rb2Z0ZWZscGhybWRrbXpjcHh3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0NDg1ODgsImV4cCI6MjA4MjAyNDU4OH0.UETZDtAZUMiGmKPhiE_b4eB6c40V43euMwhO_lU9ENQ
+
+Por favor, ejecuta esta re-estructuración completa en un solo paso:
+
+1. Corrección Técnica y Despliegue (Render):
+
+El servidor busca el frontend en /src/server/dist/public y falla. Ajusta el servidor para que busque la carpeta dist/public en la raíz del proyecto.
+
+Configura base: './' en vite.config.ts y añade el 'catch-all' para que el SPA cargue correctamente en caimanpos.com.
+
+2. Auditoría de Base de Datos (Sincronización con mis Notas): Revisa mi historial y asegúrate de que existan en Supabase las tablas y campos de mis notas:
+
+Pagos: Campos stripe_public_key, stripe_secret_key, paypal_client_id, wallet_address_usdt, transfermovil_phone/card en puntos_venta.
+
+Módulo Gastronómico: Tablas de mesas, recetas e insumos (descuento automático de stock).
+
+Gestión: Tabla historial_pagos y roles (admin, supervisor, vendedor) con políticas RLS.
+
+3. Modo Offline y PWA (Vital para Cuba):
+
+Implementa capacidades de PWA y Local Storage Persistence.
+
+Si no hay conexión o falla la VPN, las ventas y productos deben guardarse en el navegador y sincronizarse automáticamente con Supabase al detectar internet.
+
+4. Interfaz, Manual y Onboarding:
+
+Crea la pestaña 'Pagos y Moneda' en /admin/settings con formatos para PYG y CUP.
+
+Crea la página /admin/help con el manual detallado por roles.
+
+Crea un Modal de Bienvenida para dueños de tienda: '¡Bienvenido a Caiman POS! 🐊 Configura tu moneda y pagos en Ajustes. Tienes el Manual en el menú lateral'.
+
+Asegúrate de que la Vitrina Pública (/catalogo/:store_slug) sea funcional.
+
+5. Automatización de Bienvenida (Resend): Configura el envío automático de este correo desde soporte@caimanpos.com al registrar un nuevo dueño de negocio:
+
+Asunto: 🐊 ¡Bienvenido a Caiman POS Connect! - Acceso a tu cuenta
+
+Cuerpo: Incluye la URL (https://caimanpos.com), credenciales de acceso, primeros pasos (moneda y productos) y enlace al manual. Configura el 'Reply-to' a mi correo personal.
+
+Sincroniza con GitHub al terminar para que Render actualice el sitio automáticamente.
