@@ -133,4 +133,5 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 server.listen(port, "0.0.0.0", () => {
   log(`serving on port ${port} (0.0.0.0)`);
 });
+})();
 
