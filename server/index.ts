@@ -10,13 +10,14 @@ import { sendSubscriptionEmail, checkExpiringSubscriptions } from "./email";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(path.dirname(__filename));
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const pathReq = req.path;
@@ -47,8 +48,17 @@ app.use((req, res, next) => {
   next();
 });
 
+// 404 handler for API routes
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api")) {
+    return res.status(404).json({ message: "Not Found" });
+  }
+  next();
+});
+
 registerRoutes(app);
 
+// Email endpoints
 app.post("/api/email/send", async (req, res) => {
   try {
     const result = await sendSubscriptionEmail(req.body);
@@ -73,6 +83,7 @@ app.post("/api/email/check-expiring", async (req, res) => {
   }
 });
 
+// Cron job for daily subscription check
 cron.schedule("0 9 * * *", async () => {
   console.log("Running daily subscription check...");
   try {
@@ -83,53 +94,80 @@ cron.schedule("0 9 * * *", async () => {
   }
 });
 
+// Global error handler
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";
+  console.error("Global error:", err);
   res.status(status).json({ message });
-  throw err;
 });
 
 (async () => {
   const server = createServer(app);
 
-  app.use((req, res, next) => {
-    if (req.path.startsWith("/api")) {
-      return res.status(404).json({ message: "Not Found" });
-    }
-    next();
-  });
-
+  // Setup Vite for development or serve static files for production
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // SPA Catch-all route for production
-  app.get(/^(?!\/api).*/, (req, res) => {
+  // SPA catch-all route
+  app.get("*", (req, res) => {
     if (app.get("env") === "development") {
       return res.status(404).send("Not Found (Vite should handle this)");
     }
 
-    const distPath = path.resolve(__dirname, "dist", "public");
-    const indexPath = path.resolve(distPath, "index.html");
+    // Try multiple possible paths for the built frontend
+    const possiblePaths = [
+      path.join(process.cwd(), "dist", "index.html"),
+      path.join(process.cwd(), "dist", "public", "index.html"),
+      path.join(__dirname, "..", "dist", "index.html"),
+      path.join(__dirname, "..", "dist", "public", "index.html"),
+    ];
 
-    if (fs.existsSync(indexPath)) {
+    let indexPath = null;
+    
+    for (const tryPath of possiblePaths) {
+      console.log(`Checking path: ${tryPath}`);
+      if (fs.existsSync(tryPath)) {
+        indexPath = tryPath;
+        break;
+      }
+    }
+
+    if (indexPath) {
+      console.log(`Serving index.html from: ${indexPath}`);
       res.setHeader("Cache-Control", "no-cache");
-      res.sendFile(indexPath);
+      return res.sendFile(indexPath, (err) => {
+        if (err) {
+          console.error("Error sending index.html:", err);
+          res.status(500).json({
+            error: "Failed to serve frontend",
+            message: err.message,
+            path: indexPath,
+          });
+        }
+      });
     } else {
+      console.error("index.html not found in any of these locations:");
+      possiblePaths.forEach(p => console.error(`  - ${p}`));
+      
       res.status(404).json({
         error: "Frontend not found",
         message: "Make sure to run 'npm run build' first",
-        path: indexPath,
+        checkedPaths: possiblePaths,
+        cwd: process.cwd(),
+        __dirname: __dirname,
       });
     }
   });
 
-  const port = 5000;
+  const port = process.env.PORT || 5000;
   server.listen(port, "0.0.0.0", () => {
-    log(`serving on port ${port} (0.0.0.0)`);
+    log(`🚀 Server running on port ${port}`);
+    log(`📍 Environment: ${app.get("env")}`);
+    log(`📁 Working directory: ${process.cwd()}`);
+    log(`📂 __dirname: ${__dirname}`);
   });
 })();
-
