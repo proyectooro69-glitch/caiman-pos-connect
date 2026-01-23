@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server/index.ts",
-    "build": "vite build && tsx -e \"const fs = require('fs'); const path = require('path'); if (!fs.existsSync('dist/public')) { fs.mkdirSync('dist/public', { recursive: true }); }\"",
+    "build": "vite build",
     "start": "NODE_ENV=production tsx server/index.ts",
     "check": "tsc --noEmit",
     "lint": "eslint .",
