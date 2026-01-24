@@ -3,18 +3,17 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
 export default defineConfig({
-  // 👇 raíz del frontend, donde está tu index.html y main.tsx
+  // Define que el código está en la carpeta 'client'
   root: path.resolve(__dirname, "client"),
 
-  // Base relativa para que funcione en Netlify/Render
   base: "./",
 
   plugins: [react()],
 
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "client"),        // apunta a client/
-      "@shared": path.resolve(__dirname, "shared"),  // ajusta según tu estructura real
+      "@": path.resolve(__dirname, "client"),
+      "@shared": path.resolve(__dirname, "shared"),
       "@assets": path.resolve(__dirname, "client/assets"),
       "@components": path.resolve(__dirname, "client/components"),
       "@pages": path.resolve(__dirname, "client/pages"),
@@ -23,8 +22,9 @@ export default defineConfig({
   },
 
   build: {
-    // 👇 salida de los archivos compilados
-    outDir: path.resolve(__dirname, "dist/public"),
+    // CAMBIO IMPORTANTE: Lo enviamos directo a 'dist' en la raíz del proyecto
+    // para que coincida con tu configuración de Netlify
+    outDir: path.resolve(__dirname, "dist"),
     emptyOutDir: true,
   },
 
