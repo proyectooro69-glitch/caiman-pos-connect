@@ -74,7 +74,8 @@
 
 @layer base {
   * {
-    @apply border-border;
+    /* CORRECCIÓN: Usamos la variable CSS directamente para evitar el error de Tailwind */
+    border-color: hsl(var(--border));
   }
 
   body {
@@ -128,42 +129,4 @@
   }
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
-}
-
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px hsl(142 70% 45% / 0.2); }
-  50% { box-shadow: 0 0 40px hsl(142 70% 45% / 0.4); }
-}
-
-@keyframes slide-up {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--primary) / 0.5);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary) / 0.7);
-}
+@keyframes float
