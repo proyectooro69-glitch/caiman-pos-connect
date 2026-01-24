@@ -1,6 +1,7 @@
 [build]
-  command = "cd client && npm install && npm run build"
-  # Intentemos con esta ruta que es la que Netlify está buscando
+  # Forzamos la instalación y el build desde la raíz apuntando a client
+  command = "npm install --prefix client && npm run build --prefix client"
+  # Probamos con la ruta relativa simple
   publish = "client/dist"
 
 [build.environment]
