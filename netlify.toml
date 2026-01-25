@@ -1,9 +1,9 @@
 [build]
-  # Netlify entra aquí primero
+  # Entramos a la carpeta de la app
   base = "client"
-  # Ejecuta el build dentro de client
+  # Instalamos y construimos
   command = "npm install && npm run build"
-  # Como ya estamos dentro de 'client', la carpeta de salida es solo 'dist'
+  # Publicamos la carpeta que Vite acaba de crear AQUÍ MISMO
   publish = "dist"
 
 [build.environment]
