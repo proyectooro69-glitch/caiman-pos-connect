@@ -1,8 +1,8 @@
 [build]
-  # Entramos a client, construimos, y movemos la carpeta dist hacia AFUERA (a la raíz)
-  command = "cd client && npm install && npm run build && mv dist ../dist"
-  # Ahora le decimos que publique la carpeta dist que acabamos de sacar a la raíz
-  publish = "dist"
+  # Comando simple: entra y construye. No intentamos mover nada.
+  command = "cd client && npm install && npm run build"
+  # Esta es la ruta exacta donde el log mostró que se crearon los archivos
+  publish = "client/dist"
 
 [build.environment]
   NODE_VERSION = "20"
