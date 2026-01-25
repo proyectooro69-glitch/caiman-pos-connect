@@ -1,8 +1,7 @@
 [build]
-  # Comando simple: entra y construye. No intentamos mover nada.
   command = "cd client && npm install && npm run build"
-  # Esta es la ruta exacta donde el log mostró que se crearon los archivos
-  publish = "client/dist"
+  # El ./ obliga a Netlify a buscar partiendo desde donde está parado
+  publish = "./client/dist"
 
 [build.environment]
   NODE_VERSION = "20"
