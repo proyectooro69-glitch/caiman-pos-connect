@@ -1,8 +1,9 @@
 [build]
-  # 'base' le dice a Netlify que ignore la raíz y trabaje solo dentro de 'client'
+  # Netlify entra aquí primero
   base = "client"
+  # Ejecuta el build dentro de client
   command = "npm install && npm run build"
-  # Ahora 'dist' se refiere correctamente a 'client/dist'
+  # Como ya estamos dentro de 'client', la carpeta de salida es solo 'dist'
   publish = "dist"
 
 [build.environment]
