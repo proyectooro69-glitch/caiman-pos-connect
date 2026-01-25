@@ -1,5 +1,9 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
-import "./index.css";
+import "./index.css"; // Asegúrate de que este archivo tenga las 3 líneas de @tailwind
 
-createRoot(document.getElementById("root")!).render(<App />);
+const rootElement = document.getElementById("root");
+
+if (!rootElement) throw new Error("No se encontró el elemento root. Revisa tu index.html");
+
+createRoot(rootElement).render(<App />);
