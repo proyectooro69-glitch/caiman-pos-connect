@@ -1,9 +1,8 @@
 [build]
-  # Entramos a la carpeta de la app
+  # Ya sabemos que Netlify entra aquí correctamente
   base = "client"
-  # Instalamos y construimos
   command = "npm install && npm run build"
-  # Publicamos la carpeta que Vite acaba de crear AQUÍ MISMO
+  # AQUÍ ESTÁ EL CAMBIO: Solo dist, sin el prefijo 'client/'
   publish = "dist"
 
 [build.environment]
