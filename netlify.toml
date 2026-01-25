@@ -1,8 +1,10 @@
 [build]
-  # 1. Entra a client. 2. Instala. 3. Construye. 4. Saca el contenido de dist a la raíz.
-  command = "cd client && npm install && npm run build && cp -r dist/. ../dist_root"
-  # Le decimos a Netlify que busque en esa nueva carpeta en la raíz
-  publish = "dist_root"
+  # Comando ultra simple: entra y construye.
+  command = "cd client && npm install && npm run build"
+  
+  # Según tu log, Vite está soltando todo en una carpeta llamada 'dist' 
+  # en la raíz principal. Así que vamos a apuntar directamente ahí:
+  publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20"
