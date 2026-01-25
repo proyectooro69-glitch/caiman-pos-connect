@@ -1,14 +1,29 @@
 [build]
-  # Ya sabemos que Netlify entra aquí correctamente
-  base = "client"
-  command = "npm install && npm run build"
-  # AQUÍ ESTÁ EL CAMBIO: Solo dist, sin el prefijo 'client/'
+
+  # Comando ultra simple: entra y construye.
+
+  command = "cd client && npm install && npm run build"
+
+  
+
+  # Según tu log, Vite está soltando todo en una carpeta llamada 'dist' 
+
+  # en la raíz principal. Así que vamos a apuntar directamente ahí:
+
   publish = "dist"
 
+
+
 [build.environment]
+
   NODE_VERSION = "20"
 
+
+
 [[redirects]]
+
   from = "/*"
+
   to = "/index.html"
+
   status = 200
