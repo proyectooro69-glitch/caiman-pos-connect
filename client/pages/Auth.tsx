@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Store } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+
 import caimanLogo from "@/assets/caiman-logo.png";
 
 type AuthMode = "login" | "register";
@@ -14,6 +16,7 @@ const Auth = () => {
   const [mode, setMode] = useState<AuthMode>("login");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, signIn, signUp } = useAuth();
@@ -25,12 +28,22 @@ const Auth = () => {
     businessName: "",
   });
 
-  // Redirect if already logged in
+  /* ==========================
+     Redirección si ya hay sesión
+     ========================== */
   useEffect(() => {
     if (user) {
       navigate("/dashboard");
     }
   }, [user, navigate]);
+
+  /* ==========================
+     Handlers
+     ========================== */
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,50 +52,61 @@ const Auth = () => {
     try {
       if (mode === "login") {
         const { error } = await signIn(formData.email, formData.password);
+
         if (error) {
           let message = "Error al iniciar sesión";
+
           if (error.message.includes("Invalid login credentials")) {
             message = "Credenciales incorrectas";
           } else if (error.message.includes("Email not confirmed")) {
-            message = "Por favor confirma tu correo electrónico";
+            message = "Debes confirmar tu correo electrónico";
           }
+
           toast({
             title: "Error",
             description: message,
             variant: "destructive",
           });
-        } else {
-          toast({
-            title: "¡Bienvenido de vuelta!",
-            description: "Has iniciado sesión correctamente",
-          });
-          navigate("/dashboard");
+          return;
         }
+
+        toast({
+          title: "¡Bienvenido!",
+          description: "Has iniciado sesión correctamente",
+        });
+
+        navigate("/dashboard");
       } else {
         const { error } = await signUp(formData.email, formData.password, {
           nombre: formData.name,
           negocio: formData.businessName,
         });
+
         if (error) {
           let message = "Error al crear la cuenta";
+
           if (error.message.includes("already registered")) {
             message = "Este correo ya está registrado";
-          } else if (error.message.includes("Password")) {
+          } else if (error.message.toLowerCase().includes("password")) {
             message = "La contraseña debe tener al menos 6 caracteres";
           }
+
           toast({
             title: "Error",
             description: message,
             variant: "destructive",
           });
-        } else {
-          toast({
-            title: "¡Cuenta creada!",
-            description: "Revisa tu correo para confirmar tu cuenta",
-          });
+          return;
         }
+
+        toast({
+          title: "Cuenta creada 🎉",
+          description: "Revisa tu correo para confirmar tu cuenta",
+        });
+
+        setMode("login");
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Ocurrió un error inesperado",
@@ -93,57 +117,57 @@ const Auth = () => {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
-  };
-
+  /* ==========================
+     UI
+     ========================== */
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background decorations */}
+      {/* Background effects */}
       <div className="absolute inset-0 gradient-glow opacity-30" />
       <div className="absolute top-1/4 -left-32 w-64 h-64 bg-primary/10 rounded-full blur-3xl" />
       <div className="absolute bottom-1/4 -right-32 w-64 h-64 bg-primary/10 rounded-full blur-3xl" />
 
-      {/* Auth Card */}
       <div className="w-full max-w-md relative z-10 animate-slide-up">
         <div className="glass-card rounded-2xl p-8 shadow-lg">
-          {/* Logo & Header */}
+          {/* Logo */}
           <div className="text-center mb-8">
             <div className="w-20 h-20 mx-auto mb-4 rounded-xl overflow-hidden shadow-glow animate-pulse-glow">
               <img
                 src={caimanLogo}
-                alt="Caiman POS Logo"
+                alt="Caiman POS"
                 className="w-full h-full object-cover"
               />
             </div>
-            <h1 className="text-2xl font-bold text-foreground mb-1">
+
+            <h1 className="text-2xl font-bold mb-1">
               Caiman<span className="text-gradient">-POS</span>
             </h1>
+
             <p className="text-muted-foreground text-sm">
-              {mode === "login" 
-                ? "Inicia sesión en tu cuenta" 
+              {mode === "login"
+                ? "Inicia sesión en tu cuenta"
                 : "Crea tu cuenta para empezar"}
             </p>
           </div>
 
-          {/* Auth Tabs */}
+          {/* Tabs */}
           <div className="flex rounded-lg bg-secondary/50 p-1 mb-6">
             <button
+              type="button"
               onClick={() => setMode("login")}
-              className={`flex-1 py-2.5 text-sm font-medium rounded-md transition-all duration-200 ${
+              className={`flex-1 py-2.5 text-sm font-medium rounded-md transition-all ${
                 mode === "login"
                   ? "bg-primary text-primary-foreground shadow-md"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              Iniciar Sesión
+              Iniciar sesión
             </button>
+
             <button
+              type="button"
               onClick={() => setMode("register")}
-              className={`flex-1 py-2.5 text-sm font-medium rounded-md transition-all duration-200 ${
+              className={`flex-1 py-2.5 text-sm font-medium rounded-md transition-all ${
                 mode === "register"
                   ? "bg-primary text-primary-foreground shadow-md"
                   : "text-muted-foreground hover:text-foreground"
@@ -158,15 +182,12 @@ const Auth = () => {
             {mode === "register" && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-foreground">
-                    Nombre completo
-                  </Label>
+                  <Label htmlFor="name">Nombre completo</Label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                       id="name"
                       name="name"
-                      type="text"
                       placeholder="Juan Pérez"
                       value={formData.name}
                       onChange={handleInputChange}
@@ -177,15 +198,12 @@ const Auth = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="businessName" className="text-foreground">
-                    Nombre del negocio
-                  </Label>
+                  <Label htmlFor="businessName">Nombre del negocio</Label>
                   <div className="relative">
                     <Store className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                       id="businessName"
                       name="businessName"
-                      type="text"
                       placeholder="Mi Tienda"
                       value={formData.businessName}
                       onChange={handleInputChange}
@@ -198,9 +216,7 @@ const Auth = () => {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-foreground">
-                Correo electrónico
-              </Label>
+              <Label htmlFor="email">Correo electrónico</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
@@ -217,9 +233,7 @@ const Auth = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-foreground">
-                Contraseña
-              </Label>
+              <Label htmlFor="password">Contraseña</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
@@ -230,13 +244,13 @@ const Auth = () => {
                   value={formData.password}
                   onChange={handleInputChange}
                   className="pl-10 pr-10"
-                  required
                   minLength={6}
+                  required
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setShowPassword((p) => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5" />
@@ -246,17 +260,6 @@ const Auth = () => {
                 </button>
               </div>
             </div>
-
-            {mode === "login" && (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  className="text-sm text-primary hover:text-primary/80 transition-colors"
-                >
-                  ¿Olvidaste tu contraseña?
-                </button>
-              </div>
-            )}
 
             <Button
               type="submit"
@@ -268,30 +271,30 @@ const Auth = () => {
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                  <span>Procesando...</span>
+                  Procesando...
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <span>{mode === "login" ? "Iniciar Sesión" : "Crear Cuenta"}</span>
+                  {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
                   <ArrowRight className="h-5 w-5" />
                 </div>
               )}
             </Button>
           </form>
 
-          {/* Footer */}
           <p className="text-center text-sm text-muted-foreground mt-6">
             {mode === "login" ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}
             <button
-              onClick={() => setMode(mode === "login" ? "register" : "login")}
-              className="text-primary hover:text-primary/80 font-medium transition-colors"
+              onClick={() =>
+                setMode(mode === "login" ? "register" : "login")
+              }
+              className="text-primary font-medium hover:text-primary/80"
             >
               {mode === "login" ? "Regístrate" : "Inicia sesión"}
             </button>
           </p>
         </div>
 
-        {/* Branding */}
         <p className="text-center text-xs text-muted-foreground mt-6">
           © 2025 Caiman-POS. Todos los derechos reservados.
         </p>
