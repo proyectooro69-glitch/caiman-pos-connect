@@ -196,6 +196,7 @@ export const movimientosCaja = pgTable("movimientos_caja", {
   diferencia: numeric("diferencia", { precision: 12, scale: 2 }),
 });
 
+export const insertPuntoVentaSchema = createInsertSchema(puntosVenta).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertGlobalSettingsSchema = createInsertSchema(globalSettings).omit({ id: true });
 export const insertMovimientosCajaSchema = createInsertSchema(movimientosCaja).omit({ id: true });
 
@@ -219,6 +220,7 @@ export const insertConfiguracionTiendaSchema = createInsertSchema(configuracionT
 
 export type PuntoVenta = typeof puntosVenta.$inferSelect;
 export type InsertPuntoVenta = z.infer<typeof insertPuntoVentaSchema>;
+export type InsertPuntoVentaFull = typeof puntosVenta.$inferInsert;
 export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
 export type UserRole = typeof userRoles.$inferSelect;

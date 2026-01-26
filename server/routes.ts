@@ -584,13 +584,21 @@ export function registerRoutes(app: Express) {
 
       const settings = await storage.updateGlobalSettings(req.params.puntoVentaId, {
         nombreNegocio, logoUrl, direccion, telefono, correo, moneda, 
-        zonaHoraria, porcentajeIva, mensajeLegal,
-        stripePublicKey, 
-        stripeSecretKey: stripeSecretKey === "********" ? undefined : stripeSecretKey,
-        paypalClientId,
-        transfermovilPhone, transfermovilCardCup, walletAddressUsdt,
-        cryptoNetwork, currencyCode
+        zonaHoraria, porcentajeIva, mensajeLegal
       });
+
+      if (stripePublicKey !== undefined || stripeSecretKey !== undefined || paypalClientId !== undefined ||
+          transfermovilPhone !== undefined || transfermovilCardCup !== undefined || 
+          walletAddressUsdt !== undefined || cryptoNetwork !== undefined || currencyCode !== undefined) {
+        await storage.updatePuntoVenta(req.params.puntoVentaId, {
+          stripePublicKey,
+          stripeSecretKey: stripeSecretKey === "********" ? undefined : stripeSecretKey,
+          paypalClientId,
+          transfermovilPhone, transfermovilCardCup, walletAddressUsdt,
+          cryptoNetwork, currencyCode
+        });
+      }
+
       res.json(settings);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

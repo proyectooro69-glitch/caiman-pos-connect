@@ -1,91 +1,106 @@
 # Caiman POS Connect
 
+A Point of Sale (POS) system for managing stores, inventory, sales, tables, and customers.
+
 ## Overview
 
-Caiman POS Connect is a full-stack Point of Sale (POS) system designed for restaurants and retail stores. It provides inventory management, sales processing, table management for restaurants, customer tracking, and subscription-based access control. The application supports multi-tenant architecture where each store (punto de venta) operates independently with role-based access control for administrators, supervisors, and sales staff.
+Caiman POS is a Spanish-language POS application built with React frontend and Express backend, using PostgreSQL (Neon) for data storage and Supabase for authentication.
 
-## User Preferences
+## Tech Stack
 
-Preferred communication style: Simple, everyday language.
+- **Frontend**: React 18 with TypeScript, Vite, Tailwind CSS, Radix UI components
+- **Backend**: Express.js with TypeScript running via tsx
+- **Database**: PostgreSQL (Neon) with Drizzle ORM
+- **Authentication**: Supabase Auth (client-side)
+- **Email**: Resend for transactional emails (subscription reminders, payment confirmations)
 
-## System Architecture
+## Project Structure
 
-### Frontend Architecture
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite with SWC for fast compilation
-- **Routing**: React Router v6 for client-side navigation
-- **State Management**: TanStack Query (React Query) for server state and caching
-- **UI Components**: shadcn/ui component library built on Radix UI primitives
-- **Styling**: Tailwind CSS with CSS variables for theming (dark theme with green accents)
-- **Forms**: React Hook Form with Zod validation via @hookform/resolvers
-
-### Backend Architecture
-- **Runtime**: Node.js with Express.js
-- **API Pattern**: RESTful endpoints under `/api/*` prefix
-- **Database ORM**: Drizzle ORM with PostgreSQL dialect
-- **Schema Location**: `shared/schema.ts` contains all table definitions using Drizzle's pgTable
-- **Scheduled Tasks**: node-cron for subscription expiration checks and email reminders
-
-### Authentication & Authorization
-- **Auth Provider**: Supabase Auth for user authentication
-- **Session Management**: Supabase handles JWT tokens client-side
-- **Role System**: Three-tier roles (administrador, supervisor, vendedor) stored in `user_roles` table
-- **Route Protection**: `ProtectedRoute` component wraps authenticated pages
-- **Subscription Blocking**: `SubscriptionBlocker` component prevents access when subscription expires
-
-### Data Storage
-- **Primary Database**: PostgreSQL via Supabase
-- **ORM**: Drizzle ORM for type-safe queries
-- **Schema Design**: Multi-tenant with `punto_venta_id` foreign keys linking most tables to stores
-- **Key Tables**: 
-  - `puntos_venta` - Store/business entities
-  - `profiles` - User profiles linked to Supabase auth
-  - `user_roles` - Role assignments per user/store
-  - `inventario` - Products and inventory items
-  - `mesas` - Restaurant tables
-  - `clientes` - Customer records
-  - `ventas` - Sales transactions
-
-### File Structure
 ```
-client/           # Frontend React application
-  components/     # Reusable UI components
-  pages/          # Route page components
-  contexts/       # React context providers
-  hooks/          # Custom React hooks
-  lib/            # Utility functions
-  integrations/   # External service clients (Supabase)
-server/           # Backend Express application
-  routes.ts       # API endpoint definitions
-  storage.ts      # Database access layer
-  db.ts           # Database connection
-  email.ts        # Email service (Resend)
-shared/           # Shared between client and server
-  schema.ts       # Drizzle database schema
-migrations/       # Drizzle migration files
+├── client/                 # React frontend
+│   ├── components/         # UI components (Radix-based)
+│   ├── contexts/           # React contexts (AuthContext)
+│   ├── hooks/              # Custom hooks
+│   ├── integrations/       # Supabase client configuration
+│   ├── pages/              # Route pages
+│   └── main.tsx            # App entry point
+├── server/                 # Express backend
+│   ├── index.ts            # Server entry with Vite middleware
+│   ├── routes.ts           # API routes
+│   ├── storage.ts          # Database storage layer (Drizzle)
+│   ├── db.ts               # Database connection
+│   └── email.ts            # Email functionality (replaces Supabase Edge Functions)
+├── shared/                 # Shared code
+│   └── schema.ts           # Drizzle database schema
+├── supabase/               # Supabase configuration (migrations, edge functions - legacy)
+├── vite.config.ts          # Vite configuration
+├── drizzle.config.ts       # Drizzle configuration
+└── package.json            # Dependencies and scripts
 ```
 
-## External Dependencies
+## Database Schema
 
-### Database
-- **PostgreSQL**: Primary database (configured via `DATABASE_URL` environment variable)
-- **Drizzle Kit**: Database migrations and schema management
+Main tables:
+- `puntos_venta` - Stores/Point of Sale locations
+- `profiles` - User profiles
+- `user_roles` - User roles (administrador, supervisor, vendedor)
+- `inventario` - Products and supplies
+- `clientes` - Customers
+- `mesas` - Tables
+- `cuentas_mesa` - Table accounts/orders
+- `detalle_cuenta` - Order line items
+- `ventas` - Sales
+- `venta_items` - Sale line items
+- `recetas` - Recipes (product -> ingredients)
+- `agregos` - Add-ons/extras
+- `configuracion_tienda` - Store configuration
+- `global_settings` - Global settings
+- `movimientos_caja` - Cash register movements
 
-### Authentication & Backend Services
-- **Supabase**: Authentication, real-time subscriptions, and database hosting
-  - Client configured in `client/integrations/supabase/client.ts`
-  - Requires `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` environment variables
+## Development Commands
 
-### Email Service
-- **Resend**: Transactional emails for subscription reminders and payment confirmations
-  - Requires `RESEND_API_KEY` environment variable
-  - Sender email: `info@caimanpos.com`
+```bash
+npm run dev       # Start development server (tsx + Vite)
+npm run build     # Build for production
+npm run start     # Start production server
+npm run db:push   # Push schema changes to database
+```
 
-### PDF Generation
-- **jsPDF**: Client-side PDF generation for receipts and reports
+## Environment Variables
 
-### Charts & Data Visualization
-- **Recharts**: React charting library for dashboard analytics
+Required:
+- `DATABASE_URL` - PostgreSQL connection string (auto-provided by Replit)
+- `VITE_SUPABASE_URL` - Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` - Supabase anonymous key
 
-### Date Handling
-- **date-fns**: Date manipulation and formatting with Spanish locale support
+Optional:
+- `RESEND_API_KEY` - For email functionality
+- `PORT` - Server port (defaults to 5000)
+
+## API Routes
+
+All API routes are prefixed with `/api/`:
+
+- `/api/health` - Health check
+- `/api/puntos-venta` - Store CRUD
+- `/api/profiles` - User profiles CRUD
+- `/api/user-roles` - User roles
+- `/api/inventario` - Inventory CRUD
+- `/api/clientes` - Customers CRUD
+- `/api/mesas` - Tables CRUD
+- `/api/cuentas-mesa` - Table accounts
+- `/api/detalle-cuenta` - Order details
+- `/api/ventas` - Sales
+- `/api/venta-items` - Sale items
+- `/api/configuracion-tienda` - Store config
+- `/api/settings` - Global settings
+- `/api/caja` - Cash register movements
+- `/api/email/send` - Send emails
+- `/api/email/check-expiring` - Check expiring subscriptions
+
+## Notes
+
+- The app uses Supabase for authentication on the client side
+- Database operations go through the Express server using Drizzle ORM
+- Email functionality (formerly Supabase Edge Functions) is now handled by server/email.ts
+- The frontend runs on port 5000 with Vite middleware in development

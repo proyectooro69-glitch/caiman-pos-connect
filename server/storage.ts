@@ -335,11 +335,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateGlobalSettings(puntoVentaId: string, settings: Partial<schema.GlobalSettings>): Promise<schema.GlobalSettings | undefined> {
     const [updated] = await db.update(schema.globalSettings)
-      .set({
-        ...settings,
-        stripeSecretKey: settings.stripeSecretKey === "********" ? undefined : settings.stripeSecretKey,
-        updatedAt: new Date()
-      })
+      .set(settings)
       .where(eq(schema.globalSettings.puntoVentaId, puntoVentaId))
       .returning();
     return updated;
