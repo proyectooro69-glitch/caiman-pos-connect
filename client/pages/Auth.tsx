@@ -112,6 +112,25 @@ const Auth = () => {
     }
   };
 
+  const handleDemoLogin = async () => {
+    setIsLoading(true);
+    try {
+      const { error } = await signIn("demo@caimanpos.com", "demo123");
+      if (error) {
+        toast({
+          title: "Error",
+          description: "No se pudo acceder a la cuenta demo",
+          variant: "destructive",
+        });
+        return;
+      }
+      navigate("/dashboard");
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 relative overflow-hidden">
       <div className="absolute top-1/4 -left-32 w-64 h-64 bg-green-500/10 rounded-full blur-3xl" />
@@ -267,7 +286,20 @@ const Auth = () => {
                 )}
               </Button>
             </form>
-
+{mode === "login" && (
+                <div className="mt-4 pt-4 border-t border-gray-700/50">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleDemoLogin}
+                    disabled={isLoading}
+                    className="w-full text-gray-400 hover:text-green-500 hover:bg-green-500/5 transition-all"
+                  >
+                    <User className="mr-2 h-4 w-4" />
+                    Entrar como Invitado
+                  </Button>
+                </div>
+              )}
             <p className="text-center text-sm text-gray-400 mt-6">
               {mode === "login" ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}
               <button
