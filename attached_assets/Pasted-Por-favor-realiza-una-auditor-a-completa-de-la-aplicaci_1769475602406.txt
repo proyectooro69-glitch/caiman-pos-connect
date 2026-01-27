@@ -1,0 +1,46 @@
+Por favor, realiza una auditoría completa de la aplicación basándote en el Manual de Usuario y los requisitos de Configuración que te proporciono a continuación. Necesito que revises el código y la interfaz para asegurar que se cumplen estas funciones:
+
+1. Verificación de Roles y Permisos: * Comprueba si existen y funcionan los roles de: Super Administradora (control global y tiendas ), Dueño de Tienda (configuración de moneda y equipo ), Supervisor (recetas e inventario ) y Vendedor (POS y cierres de caja ).
+
+2. Módulo de Configuración (/admin/settings): * Revisa que la sección de configuración permita gestionar: Datos de la empresa, identidad visual (logo), moneda/región (USD, PYG, CUP, EUR) y ajustes de facturación. * Asegúrate de que estos datos se guarden en una tabla de Supabase llamada settings.
+
+3. Lógica de Negocio Crítica: * Recetas: Verifica que al vender un producto, el sistema descuente automáticamente los ingredientes de los insumos según la receta configurada. * Pagos Multimoneda: Confirma que el sistema soporte formatos de precio internacionales y tenga los espacios preparados para Stripe y PayPal. * Vitrina Pública: Valida que exista la ruta /catalogo/su-tienda donde los clientes puedan ver productos y hacer pedidos.
+Necesito implementar un Modo Demo (Usuario Invitado) para mi aplicación Caiman POS. Por favor, sigue estas especificaciones técnicas detalladas para garantizar que sea funcional y seguro:
+
+1. Creación del Usuario en la Base de Datos:
+
+Genera un usuario con las credenciales: Correo demo@caimanpos.com y Contraseña demo123.
+
+Asigna a este usuario un rol específico llamado guest o demo.
+
+2. Restricciones de Seguridad en el Backend (Middleware):
+
+Implementa una validación en las rutas de la API para que el usuario con rol guest tenga permisos de 'Solo Lectura' en configuraciones críticas.
+
+Prohibir: El usuario demo NO puede realizar operaciones DELETE (borrar), ni PUT/PATCH (editar) en las tablas de usuarios, configuración del negocio o registros históricos reales.
+
+Si intenta realizar una acción prohibida, devuelve un error 403 Forbidden con el mensaje: 'Acción no permitida en el modo de prueba'.
+
+3. Simulación de Ventas e Inventario:
+
+Permite que el usuario realice el flujo de 'Registrar Venta', pero asegúrate de que no descuente stock real de los productos ni afecte los reportes de ingresos principales.
+
+Los registros creados por este usuario deben marcarse con un campo is_demo: true para poder filtrarlos o eliminarlos fácilmente después.
+
+4. Cambios en la Interfaz de Usuario (Frontend):
+
+Cuando se inicie sesión con la cuenta demo, muestra un Banner persistente en la parte superior que diga: 'Estás en el modo de demostración. Los cambios no se guardarán permanentemente'.
+
+Deshabilita o esconde visualmente los botones de 'Eliminar' o 'Configuración Avanzada' para este usuario.
+
+5. Seguridad Global:
+
+Asegúrate de que estas restricciones se manejen mediante el Token JWT o la Sesión, y no solo escondiendo botones en el frontend, para evitar que alguien use herramientas como Postman para modificar datos reales.
+6. Limpieza Automática de Datos Demo (Cron Job):
+
+Implementa una tarea programada (utilizando node-cron si es Node.js o APScheduler si es Python) que se ejecute cada 6 horas.
+
+Esta tarea debe eliminar todos los registros de la base de datos que tengan la marca is_demo: true (ventas, movimientos de inventario, etc.).
+
+Asegúrate de que este proceso sea silencioso y no afecte el rendimiento del servidor mientras se ejecuta.
+Por favor, asegúrate de que el usuario demo siempre tenga un set inicial de datos (unos 5 productos y 2 ventas de ejemplo) para que la app no se vea vacía cada vez que se borren los datos."

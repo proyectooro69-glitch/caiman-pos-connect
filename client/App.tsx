@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { SubscriptionBlocker } from "@/components/SubscriptionBlocker";
+import { DemoBanner } from "@/components/DemoBanner";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Ventas from "./pages/Ventas";
@@ -28,6 +29,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
+        <DemoBanner />
         <Toaster />
         <Sonner />
         <BrowserRouter>

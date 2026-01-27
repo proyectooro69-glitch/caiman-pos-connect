@@ -6,6 +6,8 @@ import cors from "cors";
 import { fileURLToPath } from "url";
 import { registerRoutes } from "./routes";
 import { sendSubscriptionEmail, checkExpiringSubscriptions } from "./email";
+import { checkDemoRestrictions } from "./demoMiddleware";
+import { startDemoCleanupCron } from "./demoCron";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,6 +54,8 @@ app.use((req, res, next) => {
 
   next();
 });
+
+app.use(checkDemoRestrictions);
 
 registerRoutes(app);
 
@@ -128,5 +132,6 @@ function serveStatic(app: express.Express) {
   const port = process.env.PORT ? parseInt(process.env.PORT) : 5000;
   server.listen(port, "0.0.0.0", () => {
     log(`Caiman POS serving on port ${port}`);
+    startDemoCleanupCron();
   });
 })();

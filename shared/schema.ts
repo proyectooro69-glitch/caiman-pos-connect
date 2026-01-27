@@ -2,7 +2,7 @@ import { pgTable, uuid, text, numeric, integer, boolean, timestamp, date, pgEnum
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const appRoleEnum = pgEnum("app_role", ["administrador", "supervisor", "vendedor"]);
+export const appRoleEnum = pgEnum("app_role", ["administrador", "supervisor", "vendedor", "guest"]);
 
 export const puntosVenta = pgTable("puntos_venta", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -57,6 +57,7 @@ export const inventario = pgTable("inventario", {
   stockMinimo: integer("stock_minimo").default(5),
   puntoVentaId: uuid("punto_venta_id").notNull().references(() => puntosVenta.id),
   imagenUrl: text("imagen_url"),
+  isDemo: boolean("is_demo").default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -141,6 +142,7 @@ export const ventas = pgTable("ventas", {
   metodoPago: text("metodo_pago").default("Efectivo"),
   estado: text("estado").default("completada"),
   esExterna: boolean("es_externa").default(false),
+  isDemo: boolean("is_demo").default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

@@ -1,7 +1,7 @@
 // Tipos basados en tu estructura de Supabase
 // Estos tipos deben coincidir exactamente con tus tablas
 
-export type AppRole = 'administrador' | 'supervisor' | 'vendedor'
+export type AppRole = 'administrador' | 'supervisor' | 'vendedor' | 'guest'
 
 export type ProductCategory = 
   | 'bebidas' 

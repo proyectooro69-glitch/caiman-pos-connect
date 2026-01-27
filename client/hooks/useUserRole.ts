@@ -10,6 +10,7 @@ interface UserRoleData {
   isAdmin: boolean;
   isSupervisor: boolean;
   isVendedor: boolean;
+  isGuest: boolean;
 }
 
 export const useUserRole = (): UserRoleData => {
@@ -58,7 +59,7 @@ export const useUserRole = (): UserRoleData => {
 
         // Pick highest priority role if multiple exist
         const roles = (rolesData ?? []) as Array<{ role: AppRole; store_id: string | null }>;
-        const priority: AppRole[] = ['administrador', 'supervisor', 'vendedor'];
+        const priority: AppRole[] = ['administrador', 'supervisor', 'vendedor', 'guest'];
         const bestRole = priority.find((r) => roles.some((row) => row.role === r)) ?? null;
         const bestRow = bestRole ? roles.find((row) => row.role === bestRole) : roles[0];
 
@@ -86,5 +87,6 @@ export const useUserRole = (): UserRoleData => {
     isAdmin: role === 'administrador',
     isSupervisor: role === 'supervisor',
     isVendedor: role === 'vendedor',
+    isGuest: role === 'guest',
   };
 };
