@@ -286,21 +286,9 @@ const Auth = () => {
                 )}
               </Button>
             </form>
-{mode === "login" && (
-                <div className="mt-4 pt-4 border-t border-gray-700/50">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={handleDemoLogin}
-                    disabled={isLoading}
-                    className="w-full text-gray-400 hover:text-green-500 hover:bg-green-500/5 transition-all"
-                  >
-                    <User className="mr-2 h-4 w-4" />
-                    Entrar como Invitado
-                  </Button>
-                </div>
+{mode === "login" && (          
               )}
-            <p className="text-center text-sm text-gray-400 mt-6">
+            f<p className="text-center text-sm text-gray-400 mt-6">
               {mode === "login" ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}
               <button
                 type="button"

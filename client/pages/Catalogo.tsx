@@ -83,7 +83,6 @@ export default function Catalogo() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-secondary/20">
-      {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
@@ -108,7 +107,6 @@ export default function Catalogo() {
             </div>
           </div>
           
-          {/* Contact info */}
           <div className="flex flex-wrap gap-4 mt-3 text-sm text-muted-foreground">
             {config?.direccion && (
               <div className="flex items-center gap-1">
@@ -132,7 +130,6 @@ export default function Catalogo() {
         </div>
       </header>
 
-      {/* Products Grid */}
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-foreground">Nuestros Productos</h2>
@@ -160,7 +157,6 @@ export default function Catalogo() {
                 key={producto.id} 
                 className="overflow-hidden hover:shadow-lg transition-shadow duration-300"
               >
-                {/* Product Image */}
                 <div className="aspect-square bg-secondary/30 relative">
                   {producto.imagen_url ? (
                     <img 
@@ -212,23 +208,9 @@ export default function Catalogo() {
         )}
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-border bg-card py-6 mt-auto">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
           <p>Powered by Caiman POS</p>
-          {config?.whatsapp && (
-            <Button
-              variant="link"
-              className="mt-2 gap-2"
-              onClick={() => {
-                const whatsappNumber = config.whatsapp?.replace(/\D/g, "") || "";
-                window.open(`https://wa.me/${whatsappNumber}`, "_blank");
-              }}
-            >
-              <MessageCircle className="h-4 w-4" />
-              Contáctanos por WhatsApp
-            </Button>
-          )}
         </div>
       </footer>
     </div>
