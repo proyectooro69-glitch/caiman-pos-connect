@@ -286,9 +286,7 @@ const Auth = () => {
                 )}
               </Button>
             </form>
-{mode === "login" && (          
-              )}
-            f<p className="text-center text-sm text-gray-400 mt-6">
+            <p className="text-center text-sm text-gray-400 mt-6">
               {mode === "login" ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}
               <button
                 type="button"
